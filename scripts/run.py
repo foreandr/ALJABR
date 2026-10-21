@@ -197,8 +197,15 @@ def update_math(run, source=None):
                         entries = status.splitlines()
                         deleted = {line[3:] for line in entries if line.startswith('D  ')}
                         untracked = {line[3:] for line in entries if line.startswith('?? ')}
-                        if (deleted and deleted == untracked and
-                                len(entries) == 2 * len(deleted)):
+                        # Git may condense untracked files into directory entries.
+                        # Only reset if every tracked deletion still exists on disk
+                        # and every untracked entry maps to a deleted tracked path.
+                        compatible = bool(deleted) and len(entries) == len(deleted) + len(untracked)
+                        compatible = compatible and all((target / p).is_file() for p in deleted)
+                        compatible = compatible and all(
+                            any(p == d or d.startswith(p.rstrip('/') + '/') for d in deleted)
+                            for p in untracked)
+                        if compatible:
                             run.say('Repairing interrupted Lean Graph Git index...')
                             run.git('reset', '--mixed', 'HEAD', cwd=target)
                             status = run.git('status', '--porcelain', cwd=target)
