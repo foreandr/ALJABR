@@ -7,6 +7,7 @@ import json
 import logging
 import logging.handlers
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -18,6 +19,12 @@ import traceback
 ROOT = Path(__file__).resolve().parents[1]
 REPO = 'https://github.com/foreandr/ALJABR.git'
 MATHLIB_TAG = 'v4.29.0'
+
+
+class CommandError(RuntimeError):
+    def __init__(self, message, output):
+        super().__init__(message)
+        self.output = output
 
 
 def atomic_json(path, value):
@@ -88,7 +95,7 @@ class Run:
             if code == 0 and not timed_out:
                 return '\n'.join(output)
             if not retry or attempt == 3:
-                raise RuntimeError('Command failed (exit %s): %s' % (code, subprocess.list2cmdline(args)))
+                raise CommandError('Command failed (exit %s): %s' % (code, subprocess.list2cmdline(args)), '\n'.join(output))
             self.say('Retrying network operation in %s seconds...' % (attempt*2))
             time.sleep(attempt*2)
 
@@ -177,11 +184,88 @@ def repair_missing_graph_assets(run, target):
                 '-c', 'filter.lfs.required=false', 'restore', '--worktree', '--', path, cwd=target)
 
 
+def validate_export(path, expected=None):
+    """Validate one declaration at a time, including the extractor's final totals."""
+    nodes = edges = 0
+    with path.open(encoding='utf-8') as stream:
+        for number, line in enumerate(stream, 1):
+            if not line.strip():
+                continue
+            item = json.loads(line)
+            if not isinstance(item, dict) or not isinstance(item.get('name'), str):
+                raise ValueError('Invalid declaration at line %s' % number)
+            if not isinstance(item.get('edges', []), list):
+                raise ValueError('Invalid edges at line %s' % number)
+            nodes += 1
+            edges += len(item.get('edges', []))
+    if nodes == 0 or (expected is not None and (nodes, edges) != expected):
+        raise ValueError('Incomplete mathematics export: %s nodes / %s edges; expected %s' % (nodes, edges, expected))
+    return {'declarations': nodes, 'dependencies': edges}
+
+
+def extract_math(run, math, export):
+    try:
+        output = run.command(['lake', 'exe', 'graph', '--mode', 'unified', '--to', 'Mathlib', export], cwd=math)
+    except CommandError as error:
+        output = error.output
+        totals = re.search(r'\[Unified NDJSON\] Wrote (\d+) nodes and (\d+) edges', output)
+        # Upstream writes NDJSON successfully, then mistakenly treats .ndjson
+        # as a Graphviz format. Accept ONLY this post-export failure, after
+        # independently validating every declaration and both reported totals.
+        if not (totals and 'Make sure you have `graphviz` installed' in output
+                and str(export.with_suffix('.dot')) in output):
+            raise
+        counts = validate_export(export, tuple(map(int, totals.groups())))
+        run.say('Verified complete NDJSON. Ignoring upstream Graphviz post-processing error; no visualization is needed.')
+        return counts
+    totals = re.search(r'\[Unified NDJSON\] Wrote (\d+) nodes and (\d+) edges', output)
+    return validate_export(export, tuple(map(int, totals.groups())) if totals else None)
+
+
+def resume_export(run, stage):
+    receipt = stage/'export-complete.json'
+    export = stage/'mathlib_unified.ndjson'
+    if not receipt.exists() or not export.exists():
+        return None
+    saved = json.loads(receipt.read_text(encoding='utf-8'))
+    if saved['size'] != export.stat().st_size or saved['mtime_ns'] != export.stat().st_mtime_ns:
+        run.say('Saved export changed; it will be revalidated by a fresh extraction.')
+        return None
+    for name, revision in saved['revisions'].items():
+        target = run.root/'tools'/name
+        if run.git('rev-parse', 'HEAD', cwd=target) != revision:
+            run.say('Upstream checkout changed; a fresh extraction is required.')
+            return None
+    run.report.update({name + '_commit': revision for name, revision in saved['revisions'].items()})
+    run.report['resumed_export'] = saved['counts']
+    run.say('RESUMING verified export: skipping downloads, cache, build and extraction.')
+    return saved
+
+
+def staged_command(run, args, inputs, output, receipt):
+    def signature():
+        return {str(path): [path.stat().st_size, path.stat().st_mtime_ns]
+                for path in [*inputs, output]}
+    if output.exists() and receipt.exists():
+        try:
+            if json.loads(receipt.read_text(encoding='utf-8')) == signature():
+                run.say('Reusing completed stage: ' + output.name)
+                return
+        except (ValueError, OSError):
+            pass
+    receipt.unlink(missing_ok=True)
+    run.command(args)
+    atomic_json(receipt, signature())
+
+
 def update_math(run, source=None):
     root = run.root
     data = root / 'data'
     data.mkdir(exist_ok=True)
-    if source is None:
+    stage = data/'.resume'
+    stage.mkdir(exist_ok=True)
+    resumed = resume_export(run, stage) if source is None else None
+    if source is None and not resumed:
         if not shutil.which('lake'):
             run.command(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
                          '-File', root / 'install_lean.ps1'])
@@ -259,17 +343,25 @@ def update_math(run, source=None):
         run.command([sys.executable, root/'verify_lock.py', 'check'])
         run.command(['lake', 'build', 'graph'], cwd=math)
     # Stage all outputs away from the last good dataset, including supplied imports.
-    with tempfile.TemporaryDirectory(prefix='.aljabr-', dir=data) as temporary:
-        stage = Path(temporary)
+    # Keep expensive completed work after errors, including import/build failures.
+    with contextlib.nullcontext():
         export = stage/'mathlib_unified.ndjson'
-        if source is None:
-            run.command(['lake', 'exe', 'graph', '--mode', 'unified', '--to', 'Mathlib', export], cwd=math)
+        if source is None and not resumed:
+            (stage/'export-complete.json').unlink(missing_ok=True)
+            counts = extract_math(run, math, export)
+            atomic_json(stage/'export-complete.json', {
+                'size': export.stat().st_size, 'mtime_ns': export.stat().st_mtime_ns,
+                'counts': counts, 'revisions': {name: run.report[name + '_commit'] for name in ('mathlib4', 'lean-graph')}})
         else:
-            shutil.copyfile(source, export)
+            if source is not None:
+                (stage/'export-complete.json').unlink(missing_ok=True)
+                shutil.copyfile(source, export)
         if not export.exists() or export.stat().st_size == 0:
             raise RuntimeError('Extractor produced no mathematics; previous dataset preserved.')
-        run.command([sys.executable, root/'import_lean.py', export, '--output', stage/'lean_import.json'])
-        run.command([sys.executable, root/'build.py', '--input', stage/'lean_import.json', '--output', stage/'aljabr-data.js'])
+        staged_command(run, [sys.executable, root/'import_lean.py', export, '--output', stage/'lean_import.json'],
+                       [export, root/'import_lean.py'], stage/'lean_import.json', stage/'import-complete.json')
+        staged_command(run, [sys.executable, root/'build.py', '--input', stage/'lean_import.json', '--output', stage/'aljabr-data.js'],
+                       [stage/'lean_import.json', root/'build.py'], stage/'aljabr-data.js', stage/'browser-complete.json')
         # Publication rolls back every replaced file if any replacement fails.
         publications = [(export, data/export.name), (stage/'lean_import.json', data/'lean_import.json'),
                         (stage/'aljabr-data.js', root/'aljabr-data.js')]
@@ -280,14 +372,16 @@ def update_math(run, source=None):
                 if destination.exists():
                     shutil.copy2(destination, old)
                 os.replace(new, destination)
-                done.append((destination, old))
+                done.append((new, destination, old))
         except BaseException:
-            for destination, old in reversed(done):
+            for new, destination, old in reversed(done):
+                os.replace(destination, new)
                 if old.exists():
                     os.replace(old, destination)
-                else:
-                    destination.unlink(missing_ok=True)
             raise
+        for _, _, old in done:
+            old.unlink(missing_ok=True)
+        (stage/'export-complete.json').unlink(missing_ok=True)
     run.say('SUCCESS: mathematics refreshed. Open 2_OPEN_ALJABR.bat when ready.')
 
 

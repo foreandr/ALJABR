@@ -69,6 +69,20 @@ revisions) and `latest.log` (last 80 output lines). The mathematics worker's
 commands are nested under `mathematics.commands` in the report.
 
 Full timestamped output streams live under `logs/<UTC timestamp>-<process>/`.
+Completed extraction and conversion stages are retained under `data/.resume/`
+after failures. On retry, a verified export from the same upstream revisions
+skips downloads, cache setup, compilation and extraction. Completed import and
+browser stages are reused while their inputs/scripts are unchanged. After
+successful publication the next normal run checks upstream again. Downloads and
+compiled artifacts under `tools/` remain incremental; they are never cleared.
+
+The upstream extractor can finish NDJSON successfully and then fail trying to
+render it through Graphviz. ALJABR accepts that specific post-processing error
+only after independently parsing the export and matching its declaration and
+edge totals. Incomplete exports and unrelated errors still stop the update.
+Import and browser-file generation stream the large graph rather than loading
+all dependency edges into Python memory at once.
+
 Each process rotates eight 4 MiB log parts; previous run folders remain available
 locally. `summary.json` and `mathematics.json` retain structured command history.
 If upload fails, reports remain under local `diagnostics/` and the full log

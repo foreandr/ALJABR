@@ -7,6 +7,32 @@ import tempfile
 
 
 def build(source, destination):
+    if source.exists():
+        with source.open(encoding='utf8') as stream:
+            prefix = stream.read(65536)
+        # Our importer emits metadata before the large arrays. Copy its already
+        # validated JSON in chunks rather than loading a multi-GB graph in RAM.
+        if prefix.startswith('{"schema":"aljabr.lean.v1","metadata":') and ',"nodes":[' in prefix:
+            metadata = json.loads(prefix.split(',"nodes":[', 1)[0] + '}')['metadata']
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            fd, name = tempfile.mkstemp(dir=destination.parent, suffix='.js')
+            try:
+                with os.fdopen(fd, 'w', encoding='utf8') as output, source.open(encoding='utf8') as stream:
+                    output.write('window.ALJABR_DATA=')
+                    carry = ''
+                    while chunk := stream.read(1024*1024):
+                        chunk = carry + chunk
+                        carry = '<' if chunk.endswith('<') else ''
+                        if carry:
+                            chunk = chunk[:-1]
+                        output.write(chunk.replace('</', '<\\/'))
+                    output.write(carry + ';\n')
+                os.replace(name, destination)
+            finally:
+                if os.path.exists(name):
+                    os.unlink(name)
+            print(f"Built Lean-only ALJABR: {metadata['declarations']:,} declarations, {metadata['dependencies']:,} dependencies")
+            return
     lean = json.loads(source.read_text(encoding='utf8')) if source.exists() else {
         'schema': 'aljabr.lean.v1', 'metadata': {'declarations': 0, 'dependencies': 0,
         'not_imported': True}, 'nodes': [], 'edges': []}

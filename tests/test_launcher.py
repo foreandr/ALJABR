@@ -122,6 +122,75 @@ class LauncherTests(unittest.TestCase):
             run.command([runner.sys.executable, '-c', 'raise SystemExit(7)'])
         self.assertEqual(run.report['commands'][-1]['exit_code'], 7)
 
+    def test_post_export_graphviz_failure_keeps_verified_mathematics(self):
+        export = self.fixture('{"name":"Real.declaration","edges":[{"target":"Other","kind":"def"}]}\n')
+        output = ('[Unified NDJSON] Wrote 1 nodes and 1 edges\n'
+                  'Make sure you have `graphviz` installed and the file is writable.\n' + str(export.with_suffix('.dot')))
+        run = runner.Run(self.root)
+        with patch.object(run, 'command', side_effect=runner.CommandError('post-export failure', output)):
+            self.assertEqual(runner.extract_math(run, self.root, export)['dependencies'], 1)
+        export.write_text('{"name":"truncated"}\n')
+        with patch.object(run, 'command', side_effect=runner.CommandError('post-export failure', output)):
+            with self.assertRaises(ValueError):
+                runner.extract_math(run, self.root, export)
+
+    def test_unrelated_extractor_failure_is_not_ignored(self):
+        run = runner.Run(self.root)
+        with patch.object(run, 'command', side_effect=runner.CommandError('failed', 'out of memory')):
+            with self.assertRaises(runner.CommandError):
+                runner.extract_math(run, self.root, self.fixture('{"name":"Partial"}'))
+
+    def test_completed_import_stage_is_reused_until_input_changes(self):
+        source = self.fixture('first input')
+        output = self.root/'output'
+        receipt = self.root/'receipt.json'
+        run = runner.Run(self.root)
+        def produce(*args):
+            output.write_text(source.read_text())
+        with patch.object(run, 'command', side_effect=produce) as command:
+            runner.staged_command(run, ['test'], [source], output, receipt)
+            runner.staged_command(run, ['test'], [source], output, receipt)
+            self.assertEqual(command.call_count, 1)
+            source.write_text('changed input')
+            runner.staged_command(run, ['test'], [source], output, receipt)
+            self.assertEqual(command.call_count, 2)
+
+    def test_saved_export_resumes_without_download_build_or_extraction(self):
+        stage = self.root/'data'/'.resume'
+        stage.mkdir(parents=True)
+        export = stage/'mathlib_unified.ndjson'
+        export.write_text('{"name":"Saved.mathematics","edges":[]}\n')
+        runner.atomic_json(stage/'export-complete.json', {
+            'size': export.stat().st_size, 'mtime_ns': export.stat().st_mtime_ns,
+            'revisions': {'mathlib4': 'revision', 'lean-graph': 'revision'},
+            'counts': {'declarations': 1, 'dependencies': 0}})
+        run = runner.Run(self.root)
+        with patch.object(run, 'git', return_value='revision') as git, patch.object(runner, 'extract_math') as extract:
+            runner.update_math(run)
+        self.assertFalse(extract.called)
+        self.assertEqual(git.call_count, 2)
+        self.assertIn('Saved.mathematics', (self.root/'aljabr-data.js').read_text())
+
+    def test_failed_import_retains_completed_export_for_retry(self):
+        source = self.fixture('{"name":"Saved.mathematics"}\n')
+        (self.root/'build.py').write_text('raise RuntimeError("simulated build error")')
+        with self.assertRaises(RuntimeError):
+            runner.update_math(runner.Run(self.root), source)
+        saved = self.root/'data'/'.resume'/'mathlib_unified.ndjson'
+        self.assertEqual(saved.read_text(), source.read_text())
+        self.assertTrue((saved.parent/'lean_import.json').exists())
+
+    def test_large_browser_data_streams_and_escapes_chunk_boundaries(self):
+        source = self.fixture(json.dumps({'name': 'Unicode.α', 'docstring': ('x'*1048500 + '</script>')*2,
+                                        'edges': [{'target': 'external', 'kind': 'sig'}, {'target': 'bad', 'kind': 'invalid'}]}, ensure_ascii=False))
+        runner.update_math(runner.Run(self.root), source)
+        imported = json.loads((self.root/'data'/'lean_import.json').read_text(encoding='utf8'))
+        browser = (self.root/'aljabr-data.js').read_text(encoding='utf8')
+        self.assertNotIn('</script>', browser)
+        self.assertEqual(json.loads(browser[len('window.ALJABR_DATA='):-2]), imported)
+        self.assertEqual(imported['metadata']['rejected_edges'], 1)
+        self.assertEqual(imported['metadata']['unresolved_targets'], 1)
+
     def graph_assets(self):
         self.seed()
         assets = self.root/'docs'/'data'
