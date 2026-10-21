@@ -9,7 +9,7 @@
   $('sn').textContent = fmt(meta.declarations);
   $('se').textContent = fmt(meta.dependencies);
   $('ss').textContent = fmt((meta.by_decl_type.structure || 0) + (meta.by_decl_type.struct || 0) + (meta.by_decl_type.class || 0));
-  $('sourceStatus').textContent = 'Complete Lean Graph · loads on demand';
+  $('sourceStatus').textContent = 'Real Lean Graph import';
   if (location.protocol === 'file:') {
     $('message').textContent = 'Open 2_OPEN_ALJABR.bat to explore the full mathematics atlas.';
     return;
@@ -21,7 +21,7 @@
   };
   let selected = null, history = [], current = null, results = [], sequence = 0;
   const renderList = () => {
-    $('count').textContent = `First ${results.length} matches (max 180 shown)`;
+    $('count').textContent = `First ${results.length} matching declarations (max 180 shown)`;
     $('list').innerHTML = results.map(n => `<div class="item ${selected === n.id ? 'sel' : ''}" data-id="${esc(n.id)}">${esc(n.name)}<small>${esc(n.decl_type)} · ${esc(n.module)}</small></div>`).join('');
   };
   async function search() {
@@ -43,7 +43,7 @@
     const outgoing = result.edges.filter(e => e.source === id).slice(0, 100);
     const incoming = result.edges.filter(e => e.target === id).slice(0, 100);
     const links = (edges, key) => edges.map(e => `<div class="dep" data-go="${esc(e[key])}">${esc(e[key].replace(/^lean:/, ''))} <span class="sub">${esc(e.kind)}</span></div>`).join('');
-    $('details').innerHTML = `<strong>${esc(n.name)}</strong><p class="muted">${esc(n.docstring || 'No documentation provided by exporter.')}</p><div class="tag">${esc(n.decl_type)}</div><div class="tag">${esc(n.module)}</div><h3>Dependencies (${fmt(result.out_count)})</h3><div class="sub">Up to 100 shown</div>${links(outgoing, 'target')}<h3>Used by (${fmt(result.in_count)})</h3><div class="sub">Up to 100 shown</div>${links(incoming, 'source')}`;
+    $('details').innerHTML = `<strong>${esc(n.name)}</strong><p class="muted">${esc(n.docstring || 'No documentation provided by exporter.')}</p><div class="tag">${esc(n.decl_type)}</div><div class="tag">${esc(n.module)}</div><h3>Dependencies (${fmt(result.out_count)})</h3>${links(outgoing, 'target')}<h3>Used by (${fmt(result.in_count)})</h3>${links(incoming, 'source')}`;
     location.hash = encodeURIComponent(n.name);
     $('message').textContent = '';
     draw();
@@ -59,7 +59,7 @@
     const edges = [...outgoing, ...incoming];
     const ids = [...new Set(edges.flatMap(e => [e.source, e.target]))].filter(id => id !== selected && lookup.has(id)).slice(0, 40);
     const points = new Map([[selected, [475, 300]]]);
-    ids.forEach((id, i) => { const a = 2 * Math.PI * i / Math.max(ids.length, 1) - Math.PI / 2; points.set(id, [475 + Math.cos(a) * 325, 300 + Math.sin(a) * 230]); });
+    ids.forEach((id, i) => { const a = 2 * Math.PI * i / Math.max(ids.length, 1) - Math.PI / 2; points.set(id, [475 + Math.cos(a) * Math.min(325, Math.max(190, ids.length*8)), 300 + Math.sin(a) * Math.min(230, Math.max(150, ids.length*6))]); });
     function element(type, attrs, parent = svg) {
       const node = document.createElementNS('http://www.w3.org/2000/svg', type);
       for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);

@@ -17,6 +17,20 @@ ROOT = Path(__file__).resolve().parents[1]
 class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         url = urlsplit(self.path)
+        if url.path in ('/', '/aljabr.html'):
+            # Keep the user's reference HTML untouched. Only connect its data
+            # adapter while serving the complete disk-backed atlas.
+            html = (ROOT/'aljabr.html').read_text(encoding='utf8')
+            html = html.replace("(()=>{'use strict';const d=", "(()=>{'use strict';if(window.ALJABR_DATA?.api)return;const d=")
+            html = html.replace('</body>', '<script src="atlas-client.js"></script></body>')
+            payload = html.encode('utf8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Content-Length', str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+            return
         if not url.path.startswith('/api/'):
             if url.path not in ('/', '/aljabr.html', '/aljabr-data.js', '/atlas-client.js', '/favicon.ico'):
                 self.send_error(404)
