@@ -1,6 +1,87 @@
-ALJABR update started. Full local logs: C:\Users\forea\Downloads\ALJABR\ALJABR\logs\20261021T032543382573Z-11276
-COMMAND: git --version
-git version 2.55.0.windows.2
-COMMAND: git rev-parse HEAD
-ab007b7b49bef8922154fd10c6a3177b9ee81008
-COMMAND: git status --short
+D  LeanGraph/Lean/Name.lean
+D  LeanGraph/Lean/WithImportModules.lean
+D  LeanGraph/Meta.lean
+D  LeanGraph/RequiredModules.lean
+D  LeanGraph/Tools.lean
+D  LeanGraph/Tools/FindHome.lean
+D  LeanGraph/Tools/ImportDiff.lean
+D  LeanGraph/Tools/MinImports.lean
+D  LeanGraph/Tools/RedundantImports.lean
+D  LeanGraph/Types.lean
+D  LeanGraph/Util/CurrentModule.lean
+D  LeanGraph/Util/FindSorry.lean
+D  LeanGraphTest.lean
+D  LeanGraphTest/.gitignore
+D  LeanGraphTest/AnotherFileWithTransitiveImports.lean
+D  LeanGraphTest/Dot.lean
+D  LeanGraphTest/FileWithTransitiveImports.lean
+D  LeanGraphTest/FilteringTests.lean
+D  LeanGraphTest/FromSource.lean
+D  LeanGraphTest/Imports.lean
+D  LeanGraphTest/RegressionTests.lean
+D  LeanGraphTest/ToTarget.lean
+D  LeanGraphTest/UnifiedGraphTests.lean
+D  LeanGraphTest/Unused.lean
+D  LeanGraphTest/Used.lean
+D  LeanGraphTest/WithSorry/Def.lean
+D  LeanGraphTest/WithSorry/Thm.lean
+D  LeanGraphTest/expected.dot
+D  MainExportStatements.lean
+D  MainGraph.lean
+D  MainTest.lean
+D  MainUnusedTransitiveImports.lean
+D  README.md
+D  docs/FILTERING.md
+D  docs/README.md
+D  docs/convert_to_db.py
+D  docs/convert_to_json.py
+D  docs/convert_unified.py
+D  docs/data/imports.db
+D  docs/data/structures.db
+D  docs/data/type-deps.db
+D  docs/dev/GRAPH_GENERATION.md
+D  docs/dev/IMPLEMENTATION.md
+D  docs/dev/TODO.md
+D  docs/dynamic-explorer.js
+D  docs/index.html
+D  docs/sqlite-explorer.js
+D  html-template/.gitignore
+D  html-template/LICENSE_source
+D  html-template/README.md
+D  html-template/index.html
+D  html-template/vendor/graphology-LICENSE
+D  html-template/vendor/graphology-library.min.js
+D  html-template/vendor/graphology.min.js
+D  html-template/vendor/sigma-LICENSE
+D  html-template/vendor/sigma.min.js
+D  lake-manifest.json
+D  lakefile.toml
+D  lean-toolchain
+?? .gitattributes
+?? .github/
+?? .gitignore
+?? .gitpod.yml
+?? LICENSE
+?? LeanGraph.lean
+?? LeanGraph/
+?? LeanGraphTest.lean
+?? LeanGraphTest/
+?? MainExportStatements.lean
+?? MainGraph.lean
+?? MainTest.lean
+?? MainUnusedTransitiveImports.lean
+?? README.md
+?? docs/
+?? html-template/
+?? lake-manifest.json
+?? lakefile.toml
+?? lean-toolchain
+ALJABR ERROR: Local Lean Graph edits found; commit or stash them before updating.
+Traceback (most recent call last):
+  File "C:\Users\forea\Downloads\ALJABR\ALJABR\scripts\run.py", line 304, in main
+    run.command(command)
+    ~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\forea\Downloads\ALJABR\ALJABR\scripts\run.py", line 91, in command
+    raise RuntimeError('Command failed (exit %s): %s' % (code, subprocess.list2cmdline(args)))
+RuntimeError: Command failed (exit 1): C:\Users\forea\AppData\Local\Python\pythoncore-3.14-64\python.exe -u C:\Users\forea\Downloads\ALJABR\ALJABR\scripts\run.py --worker --worker-report C:\Users\forea\Downloads\ALJABR\ALJABR\logs\20261021T032705909748Z-4488\mathematics.json
+
