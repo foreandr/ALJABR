@@ -191,26 +191,16 @@ def update_math(run, source=None):
                 else:
                     status = run.git('status', '--porcelain', cwd=target)
                     if status:
-                        # A previous interrupted clone can leave every tracked file
-                        # staged for deletion while the identical working files are
-                        # untracked. Repair the index only for this exact pattern.
-                        entries = status.splitlines()
-                        deleted = {line[3:] for line in entries if line.startswith('D  ')}
-                        untracked = {line[3:] for line in entries if line.startswith('?? ')}
-                        # Git may condense untracked files into directory entries.
-                        # Only reset if every tracked deletion still exists on disk
-                        # and every untracked entry maps to a deleted tracked path.
-                        compatible = bool(deleted) and len(entries) == len(deleted) + len(untracked)
-                        compatible = compatible and all((target / p).is_file() for p in deleted)
-                        compatible = compatible and all(
-                            any(p == d or d.startswith(p.rstrip('/') + '/') for d in deleted)
-                            for p in untracked)
-                        if compatible:
-                            run.say('Repairing interrupted Lean Graph Git index...')
+                        # Reset only the index, never the worktree. This repairs the
+                        # mass staged-delete / untracked-file state left by an
+                        # interrupted Git checkout without discarding source edits.
+                        staged = run.git('diff', '--cached', '--name-status', cwd=target)
+                        if staged and all(line.startswith('D\t') for line in staged.splitlines()):
+                            run.say('Recovering Lean Graph Git index (worktree preserved)...')
                             run.git('reset', '--mixed', 'HEAD', cwd=target)
                             status = run.git('status', '--porcelain', cwd=target)
                         if status:
-                            raise RuntimeError('Local Lean Graph edits found; commit or stash them before updating.')
+                            raise RuntimeError('Lean Graph checkout contains genuine changes after index repair; refusing to overwrite them.')
                     run.git('pull', '--ff-only', cwd=target, retry=True)
         expected = 'leanprover/lean4:' + MATHLIB_TAG
         for target in (math, graph):
