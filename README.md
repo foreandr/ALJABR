@@ -129,7 +129,7 @@ Its layered graph, construction methods, pan/zoom, trace slider, and inspector
 remain intact. These original construction routes are curated explanations,
 not automatically inferred from Lean dependency edges.
 
-The inspector's **Explore Lean dependencies** link and search for imported
+Search for imported
 names open the complete local dataset using the same canvas and inspector
 styling. The imported graph uses directed, layered dependencies, supports
 selection, pan/zoom, history and tracing, and bounds each view to 70 nodes.

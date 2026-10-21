@@ -1,19 +1,6 @@
 /* Preserve the baseline construction atlas; connect search and inspector to Lean. */
 (() => {
   const escape = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const mappings = {ring:'Ring',cring:'CommRing',field:'Field',module:'Module',vspace:'Module',group:'Group',monoid:'Monoid',semigroup:'Semigroup',set:'Set'};
-  const originalPanel = panel;
-  panel = function () {
-    originalPanel();
-    const name = mappings[sel] || N[sel].name.replaceAll(' ', '');
-    const link = document.createElement('a');
-    link.className = 'chip';
-    link.textContent = 'Explore Lean dependencies ↗';
-    link.href = '/aljabr.html?lean=' + encodeURIComponent('lean:' + name);
-    ins.insertAdjacentHTML('beforeend', '<div class="sc">Imported mathematics</div><div class="l">This view shows the original curated construction routes.</div>');
-    ins.append(link);
-  };
-  panel();
   let timer, version = 0, matches = [];
   const curatedOptions = $('nl').innerHTML;
   $('q').oninput = () => {
