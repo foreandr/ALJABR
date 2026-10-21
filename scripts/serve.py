@@ -4,7 +4,6 @@ from contextlib import closing
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
-import re
 from pathlib import Path
 import sqlite3
 import webbrowser
@@ -19,13 +18,7 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         url = urlsplit(self.path)
         if url.path in ('/', '/aljabr.html'):
-            # Keep the user's reference HTML untouched. Only connect its data
-            # adapter while serving the complete disk-backed atlas.
             html = (ROOT/'aljabr.html').read_text(encoding='utf8')
-            if 'lean' in parse_qs(url.query):
-                html = re.sub(r'<script>.*?</script>', '<script src="atlas-client.js"></script>', html, flags=re.S)
-            else:
-                html = html.replace('</body>', '<script src="baseline-data.js"></script></body>')
             payload = html.encode('utf8')
             self.send_response(200)
             self.send_header('Content-Type', 'text/html; charset=utf-8')
@@ -35,7 +28,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(payload)
             return
         if not url.path.startswith('/api/'):
-            if url.path not in ('/', '/aljabr.html', '/aljabr-data.js', '/atlas-client.js', '/baseline-data.js', '/favicon.ico'):
+            if url.path not in ('/', '/aljabr.html', '/aljabr-data.js', '/atlas-client.js', '/favicon.ico'):
                 self.send_error(404)
                 return
             return super().do_GET()

@@ -122,17 +122,12 @@ publication rollback, process locking and command failure reports. It uses
 small temporary test fixtures, never the production mathematics dataset.
 A full Lean/Mathlib build is a separate, substantial end-to-end operation.
 
-## Original construction interface
+## Interface
 
-The home page is the exact October 14, 2026 baseline HTML supplied by the owner.
-Its layered graph, construction methods, pan/zoom, trace slider, and inspector
-remain intact. These original construction routes are curated explanations,
-not automatically inferred from Lean dependency edges.
-
-Search for imported
-names open the complete local dataset using the same canvas and inspector
-styling. The imported graph uses directed, layered dependencies, supports
-selection, pan/zoom, history and tracing, and bounds each view to 70 nodes.
-The route selector is disabled there because the export does not encode
-alternative construction methods. All 28 million edges remain in SQLite.
+ALJABR uses the October 14 interface styling with one graph powered entirely
+by the local Lean database. The hand-authored model has been removed.
+Search, dependency relations, trace depth, focus, navigation, pan/zoom and the
+inspector operate on imported declarations and edges. Relations distinguish
+signature, proof and definition dependencies; they do not invent constructions.
+The canvas loads bounded neighborhoods while all edges remain in SQLite.
 No mathematics rebuild is needed for interface changes.

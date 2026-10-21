@@ -8,6 +8,10 @@
   const colors = {class:'#6cb4ff',struct:'#6cb4ff',axiom:'#7be0b4',thm:'#7be0b4'};
   const color = n => colors[n.decl_type] || '#f0a15b';
   let current, nodes = new Map(), edges = [], positions = new Map(), selected, generation = 0;
+  const relations = ['all','sig','proof','def'];
+  let relation = 0;
+  const accepts = e => relation === 0 || e.kind === relations[relation];
+  const locationId = () => { const raw = new URLSearchParams(location.search).get('lean') || decodeURIComponent(location.hash.slice(1)) || 'Module'; const aliases = {vspace:'Module',module:'Module',ring:'Ring',field:'Field'}; const name = aliases[raw] || raw; return name.startsWith('lean:') ? name : 'lean:' + name; };
   let depth = 1, focused = false, camera = {x:0,y:0,k:1}, drag, searchTimer, searchVersion = 0;
   const cache = new Map();
   const fetchNode = async id => { if (!cache.has(id)) { const result = await api('node?id=' + encodeURIComponent(id)); if (!result) throw Error('Declaration not found: ' + id); cache.set(id,result); if (cache.size > 150) cache.delete(cache.keys().next().value); } return cache.get(id); };
@@ -26,7 +30,7 @@
     const deps=[...new Set(current.edges.filter(e=>e.source===selected).map(e=>e.target))];
     const users=[...new Set(current.edges.filter(e=>e.target===selected).map(e=>e.source))];
     const lookup=new Map(current.nodes.map(n=>[n.id,n]));
-    $('ins').innerHTML=`<div class="k" style="color:${color(n)}">${esc(n.decl_type.toUpperCase())} · LEAN</div><h2>${esc(n.name)}</h2><p>${esc(n.docstring || n.module)}</p><div class="sc">Requires · ${fmt(current.out_count)} dependency edges</div>${deps.map(id=>lookup.has(id)?chip(lookup.get(id)):'').join('')}<div class="sc">Used by · ${fmt(current.in_count)} dependency edges</div>${users.map(id=>lookup.has(id)?chip(lookup.get(id)):'').join('')}<div class="l">The inspector loads up to 100 edges in each direction. The canvas traces up to 70 declarations, with 12 neighbors per direction at each step. Select a declaration to continue exploring.</div><div class="sc">Source</div><p>${esc(n.module)}</p><a class="chip" href="/aljabr.html">Construction atlas ↗</a>`;
+    $('ins').innerHTML=`<div class="k" style="color:${color(n)}">${esc(n.decl_type.toUpperCase())} · LEAN</div><h2>${esc(n.name)}</h2><p>${esc(n.docstring || n.module)}</p><div class="sc">Requires · ${fmt(current.out_count)} dependency edges</div>${deps.map(id=>lookup.has(id)?chip(lookup.get(id)):'').join('')}<div class="sc">Used by · ${fmt(current.in_count)} dependency edges</div>${users.map(id=>lookup.has(id)?chip(lookup.get(id)):'').join('')}<div class="l">The inspector loads up to 100 edges in each direction. The canvas traces up to 70 declarations, with 12 neighbors per direction at each step. Select a declaration to continue exploring.</div><div class="sc">Source</div><p>${esc(n.module)}</p>`;
   }
   function draw() {
     $('rg').innerHTML=''; $('sg').innerHTML='';
@@ -54,7 +58,7 @@
         const q=queue.shift(); if(seen.has(q.id)||q.level>=depth)continue; seen.add(q.id);
         const data=await fetchNode(q.id); calls++; if(token!==generation)return;
         const lookup=new Map(data.nodes.map(n=>[n.id,n]));
-        const outgoing=data.edges.filter(e=>e.source===q.id), incoming=focused?[]:data.edges.filter(e=>e.target===q.id);
+        const outgoing=data.edges.filter(e=>e.source===q.id && accepts(e)), incoming=focused?[]:data.edges.filter(e=>e.target===q.id && accepts(e));
         for(const [list,direction] of [[outgoing,-1],[incoming,1]]) {
           const neighbors=new Set();
           for(const edge of list) {
@@ -71,30 +75,33 @@
       selected=id;current=root;nodes=nextNodes;edges=[...nextEdges.values()];positions=new Map();
       const groups=new Map();for(const [key,col] of cols){if(!groups.has(col))groups.set(col,[]);groups.get(col).push(key);}
       for(const [col,ids] of groups)ids.forEach((key,i)=>positions.set(key,{x:col*490,y:(i-(ids.length-1)/2)*100}));
-      if(push)history.pushState({lean:id},'', '/aljabr.html?lean='+encodeURIComponent(id));
-      $('methodCount').textContent=fmt(nodes.size)+' nodes';$('mt').textContent='Imported dependency graph';
+      if(push)history.pushState({lean:id},'', '/aljabr.html#'+encodeURIComponent(id));
+      $('methodCount').textContent=fmt(nodes.size)+' nodes';$('mt').textContent=relation ? ({sig:'Signature',proof:'Proof',def:'Definition'}[relations[relation]]) : 'All dependencies';
       draw();panel();fit();
-    }catch(error){if(token!==generation)return;console.error('ALJABR graph load',error);$('mt').textContent='Could not load graph';$('ins').innerHTML=`<h2>Unable to load</h2><p>${esc(error.message)}</p><a href="/aljabr.html">Return to construction atlas</a>`;}
+    }catch(error){if(token!==generation)return;console.error('ALJABR graph load',error);$('mt').textContent='Could not load graph';$('ins').innerHTML=`<h2>Unable to load</h2><p>${esc(error.message)}</p><a href="/aljabr.html">Try again</a>`;}
   }
   $('dp').value=depth;$('dv').textContent=depth;$('dp').oninput=e=>{depth=+e.target.value;$('dv').textContent=depth;select(selected,false);};
   $('focus').textContent='All branches';$('focus').setAttribute('aria-pressed','false');$('focus').title='Toggle dependencies only';
   $('focus').onclick=()=>{focused=!focused;$('focus').textContent=focused?'Focused ✓':'All branches';$('focus').setAttribute('aria-pressed',String(focused));select(selected,false);};
-  for(const id of ['mp','mn','methodsList']){$(id).disabled=true;$(id).title='Construction routes are available in the curated atlas; Lean edges do not encode alternative construction methods.';}
+  const setRelation = index => { relation = (index + relations.length) % relations.length; $('methodMenu').classList.remove('open'); $('methodsList').setAttribute('aria-expanded','false'); select(selected,false); };
+  $('mp').onclick=()=>setRelation(relation-1);$('mn').onclick=()=>setRelation(relation+1);
+  $('methodsList').onclick=()=>{ const open=$('methodMenu').classList.toggle('open');$('methodsList').setAttribute('aria-expanded',String(open));$('methodMenu').innerHTML=relations.map((name,i)=>`<button class="method-option ${i===relation?'active':''}" data-relation="${i}">${name==='all'?'All dependencies':name==='sig'?'Signature':name==='proof'?'Proof':'Definition'}</button>`).join(''); };
+  $('methodMenu').onclick=e=>{const b=e.target.closest('[data-relation]');if(b)setRelation(+b.dataset.relation);};
   $('bk').onclick=()=>history.back();$('fw').onclick=()=>history.forward();
-  addEventListener('popstate',()=>select(new URLSearchParams(location.search).get('lean')||'lean:Module',false));
+  addEventListener('popstate',()=>select(locationId(),false));
   $('rn').onclick=()=>{const choices=[...nodes.keys()].filter(id=>id!==selected);if(choices.length)select(choices[Math.floor(Math.random()*choices.length)]);};
   $('ins').onclick=e=>{const b=e.target.closest('[data-id]');if(b)select(b.dataset.id);};
   $('tg').onclick=()=>$('ins').classList.toggle('o');
   $('sv').onkeydown=e=>{const n=e.target.closest('[data-id]');if(n&&['Enter',' '].includes(e.key)){e.preventDefault();select(n.dataset.id);}};
-  $('cv').onpointerdown=e=>{if(e.target.closest('#bar,#vp'))return;const n=e.target.closest('[data-id]');drag={x:e.clientX,y:e.clientY,cx:camera.x,cy:camera.y,id:n?.dataset.id,moved:false};$('cv').setPointerCapture(e.pointerId);};
+  $('cv').onpointerdown=e=>{if(e.target.closest('#bar,#vp,#methodMenu'))return;const n=e.target.closest('[data-id]');drag={x:e.clientX,y:e.clientY,cx:camera.x,cy:camera.y,id:n?.dataset.id,moved:false};$('cv').setPointerCapture(e.pointerId);};
   $('cv').onpointermove=e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.hypot(dx,dy)>5)drag.moved=true;camera.x=drag.cx+dx;camera.y=drag.cy+dy;apply();};
   $('cv').onpointerup=()=>{if(drag?.id&&!drag.moved)select(drag.id);drag=null;};$('cv').onpointercancel=()=>drag=null;
-  $('cv').addEventListener('wheel',e=>{if(e.target.closest('#bar,#vp'))return;e.preventDefault();const r=$('cv').getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top,k=Math.min(3,Math.max(.03,camera.k*Math.exp(-e.deltaY*.0015)));camera.x=x-(x-camera.x)*k/camera.k;camera.y=y-(y-camera.y)*k/camera.k;camera.k=k;apply();},{passive:false});
+  $('cv').addEventListener('wheel',e=>{if(e.target.closest('#bar,#vp,#methodMenu'))return;e.preventDefault();const r=$('cv').getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top,k=Math.min(3,Math.max(.03,camera.k*Math.exp(-e.deltaY*.0015)));camera.x=x-(x-camera.x)*k/camera.k;camera.y=y-(y-camera.y)*k/camera.k;camera.k=k;apply();},{passive:false});
   $('q').oninput=()=>{const token=++searchVersion;clearTimeout(searchTimer);searchTimer=setTimeout(async()=>{try{const rows=await api('search?q='+encodeURIComponent($('q').value));if(token===searchVersion)$('nl').innerHTML=rows.map(n=>`<option value="${esc(n.name)}">${esc(n.decl_type)}</option>`).join('');}catch(e){console.error('ALJABR search',e);}},220);};
-  $('q').onchange=async()=>{try{const value=$('q').value.trim(),rows=await api('search?q='+encodeURIComponent(value)),n=rows.find(n=>n.name.toLowerCase()===value.toLowerCase())||rows[0];if(n){select(n.id);$('q').value='';}else{$('q').setCustomValidity('No matching declaration');$('q').reportValidity();}}catch(e){console.error(e);}};
+  $('q').onchange=async()=>{try{const typed=$('q').value.trim(),value=/^vector[ -]?space$/i.test(typed)?'Module':typed,rows=await api('search?q='+encodeURIComponent(value)),n=rows.find(n=>n.name.toLowerCase()===value.toLowerCase())||rows[0];if(n){select(n.id);$('q').value='';}else{$('q').setCustomValidity('No matching declaration');$('q').reportValidity();}}catch(e){console.error(e);}};
   $('q').addEventListener('input',()=>$('q').setCustomValidity(''));
   $('vb').onclick=()=>$('vp').classList.toggle('o');
   addEventListener('resize',fit);addEventListener('keydown',e=>{if(e.key==='/'&&e.target.tagName!=='INPUT'){e.preventDefault();$('q').focus();}if(e.key==='Escape')$('vp').classList.remove('o');});
   try {const health=await api('health');$('vb').textContent='⊢ '+fmt(health.metadata.declarations);$('vp').textContent=fmt(health.metadata.declarations)+' declarations · '+fmt(health.metadata.dependencies)+' dependency edges. Complete data stored locally; canvas loads bounded neighborhoods.';}catch(e){console.error(e);}
-  await select(new URLSearchParams(location.search).get('lean')||'lean:Module',false);
+  await select(locationId(),false);
 })();
