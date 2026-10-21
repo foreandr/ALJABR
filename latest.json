@@ -483,5 +483,19 @@
     "lean-graph_commit": "3bf57c70f0326e45b9e84345c8fe7cf520919358",
     "toolchain": "leanprover/lean4:v4.29.0"
   },
-  "seconds": 3117.17
+  "seconds": 3117.17,
+  "viewer": {
+    "status": "verified",
+    "commit": "e3bb412",
+    "declarations": 736618,
+    "dependencies": 28235882,
+    "checks": [
+      "browser loads full counts",
+      "search",
+      "structure filter",
+      "Ring dependency navigation",
+      "open launcher"
+    ],
+    "url": "http://127.0.0.1:8765/aljabr.html"
+  }
 }

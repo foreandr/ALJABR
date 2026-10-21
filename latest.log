@@ -78,3 +78,5 @@ JSON: C:\Users\forea\Downloads\ALJABR\ALJABR\data\.resume\lean_import.json
 COMMAND: C:\Users\forea\AppData\Local\Python\pythoncore-3.14-64\python.exe C:\Users\forea\Downloads\ALJABR\ALJABR\build.py --input C:\Users\forea\Downloads\ALJABR\ALJABR\data\.resume\lean_import.json --output C:\Users\forea\Downloads\ALJABR\ALJABR\data\.resume\aljabr-data.js
 Built Lean-only ALJABR: 736,618 declarations, 28,235,882 dependencies
 SUCCESS: mathematics refreshed. Open 2_OPEN_ALJABR.bat when ready.
+
+Viewer verified: complete atlas indexed; search, structures filter and Ring navigation work. Commit e3bb412.
