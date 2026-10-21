@@ -189,8 +189,21 @@ def update_math(run, source=None):
                     run.git('fetch', '--depth', '1', 'origin', 'tag', branch, cwd=target, retry=True)
                     run.git('checkout', '--detach', 'tags/' + branch, cwd=target)
                 else:
-                    if run.git('status', '--porcelain', cwd=target):
-                        raise RuntimeError('Local Lean Graph edits found; commit or stash them before updating.')
+                    status = run.git('status', '--porcelain', cwd=target)
+                    if status:
+                        # A previous interrupted clone can leave every tracked file
+                        # staged for deletion while the identical working files are
+                        # untracked. Repair the index only for this exact pattern.
+                        entries = status.splitlines()
+                        deleted = {line[3:] for line in entries if line.startswith('D  ')}
+                        untracked = {line[3:] for line in entries if line.startswith('?? ')}
+                        if (deleted and deleted == untracked and
+                                len(entries) == 2 * len(deleted)):
+                            run.say('Repairing interrupted Lean Graph Git index...')
+                            run.git('reset', '--mixed', 'HEAD', cwd=target)
+                            status = run.git('status', '--porcelain', cwd=target)
+                        if status:
+                            raise RuntimeError('Local Lean Graph edits found; commit or stash them before updating.')
                     run.git('pull', '--ff-only', cwd=target, retry=True)
         expected = 'leanprover/lean4:' + MATHLIB_TAG
         for target in (math, graph):
