@@ -14,7 +14,7 @@ class IndexTests(unittest.TestCase):
             root = Path(folder)
             raw = root/'graph.ndjson'
             items = [{'name': 'Module', 'decl_type': 'class', 'edges': [{'target': 'Group', 'kind': 'sig', 'binder': 'implicit'}]},
-                     {'name': 'Group', 'decl_type': 'structure', 'edges': []}]
+                     {'name': 'Group', 'decl_type': 'struct', 'edges': []}]
             items += [{'name': f'User{i}', 'decl_type': 'def', 'edges': [{'target': 'Module', 'kind': 'def'}]} for i in range(150)]
             raw.write_text('\n'.join(json.dumps(item) for item in items), encoding='utf8')
             database = root/'atlas.sqlite'

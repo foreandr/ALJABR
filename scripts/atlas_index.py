@@ -61,8 +61,9 @@ def search(connection, query='', kind=''):
         conditions.append('instr(lower(name), lower(?)) > 0')
         args.append(query)
     if kind:
-        conditions.append('decl_type=?')
-        args.append(kind)
+        alias = {'structure': 'struct', 'inductive': 'ind'}.get(kind, kind)
+        conditions.append('decl_type IN (?,?)')
+        args.extend((kind, alias))
     where = ' WHERE ' + ' AND '.join(conditions) if conditions else ''
     return [json.loads(row[0]) for row in connection.execute('SELECT payload FROM nodes' + where + ' LIMIT 180', args)]
 

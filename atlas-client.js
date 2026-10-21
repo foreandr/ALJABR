@@ -8,7 +8,7 @@
   const meta = data.metadata;
   $('sn').textContent = fmt(meta.declarations);
   $('se').textContent = fmt(meta.dependencies);
-  $('ss').textContent = fmt((meta.by_decl_type.structure || 0) + (meta.by_decl_type.class || 0));
+  $('ss').textContent = fmt((meta.by_decl_type.structure || 0) + (meta.by_decl_type.struct || 0) + (meta.by_decl_type.class || 0));
   $('sourceStatus').textContent = 'Complete Lean Graph · loads on demand';
   if (location.protocol === 'file:') {
     $('message').textContent = 'Open 2_OPEN_ALJABR.bat to explore the full mathematics atlas.';
@@ -91,7 +91,7 @@
     await search();
     if (location.hash) await show('lean:' + decodeURIComponent(location.hash.slice(1)), false);
     else {
-      const candidates = await request('/api/search?q=Module');
+      const candidates = await request('/api/search?q=Module&type=class');
       const first = candidates.find(n => n.name === 'Module') || results[0];
       if (first) await show(first.id, false);
     }
