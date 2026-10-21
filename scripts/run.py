@@ -197,6 +197,25 @@ def update_math(run, source=None):
                         staged = run.git('diff', '--cached', '--name-status', cwd=target)
                         if staged and all(line.startswith('D\t') for line in staged.splitlines()):
                             run.say('Recovering Lean Graph Git index (worktree preserved)...')
+                            lock = target / '.git' / 'index.lock'
+                            if lock.exists():
+                                # Never remove a recent lock: another Git process
+                                # could be actively writing the index.
+                                age = time.time() - lock.stat().st_mtime
+                                if age < 300:
+                                    raise RuntimeError(
+                                        'Lean Graph Git index is locked (%.0fs old). '
+                                        'Close other Git processes and retry after five minutes.' % age)
+                                # Rename to a diagnostic backup, not unlink. This
+                                # preserves the lock's bytes and prevents overwrites.
+                                backup = run.folder / 'lean-graph-stale-index.lock'
+                                try:
+                                    os.replace(lock, backup)
+                                except OSError as error:
+                                    raise RuntimeError(
+                                        'Cannot safely recover Lean Graph index.lock; '
+                                        'another process may still own it.') from error
+                                run.say('Quarantined stale Lean Graph index.lock')
                             run.git('reset', '--mixed', 'HEAD', cwd=target)
                             status = run.git('status', '--porcelain', cwd=target)
                         if status:
