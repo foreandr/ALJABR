@@ -122,6 +122,14 @@ class LauncherTests(unittest.TestCase):
             run.command([runner.sys.executable, '-c', 'raise SystemExit(7)'])
         self.assertEqual(run.report['commands'][-1]['exit_code'], 7)
 
+    def test_git_warnings_do_not_contaminate_machine_readable_output(self):
+        run = runner.Run(self.root)
+        output = run.command([runner.sys.executable, '-c',
+                              'import sys; print("lakefile.lean"); print("warning: LF will be replaced by CRLF", file=sys.stderr)'],
+                             stdout_only=True)
+        self.assertEqual(output, 'lakefile.lean')
+        self.assertTrue(any('warning:' in line for line in run.tail))
+
     def test_post_export_graphviz_failure_keeps_verified_mathematics(self):
         export = self.fixture('{"name":"Real.declaration","edges":[{"target":"Other","kind":"def"}]}\n')
         output = ('[Unified NDJSON] Wrote 1 nodes and 1 edges\n'

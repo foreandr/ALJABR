@@ -56,7 +56,7 @@ class Run:
         self.log.info(text)
         self.tail.append(str(text)[-2000:])
 
-    def command(self, args, cwd=None, retry=False, timeout=None):
+    def command(self, args, cwd=None, retry=False, timeout=None, stdout_only=False):
         args = list(map(str, args))
         for attempt in range(1, (3 if retry else 1) + 1):
             self.say('COMMAND: ' + subprocess.list2cmdline(args))
@@ -68,9 +68,10 @@ class Run:
             output = []
             env = dict(os.environ, GIT_TERMINAL_PROMPT='0', PYTHONUNBUFFERED='1',
                        GCM_INTERACTIVE='Never', GIT_LFS_SKIP_SMUDGE='1')
-            with subprocess.Popen(args, cwd=cwd or self.root, stdout=subprocess.PIPE,
-                                  stderr=subprocess.STDOUT, text=True, encoding='utf-8',
-                                  errors='replace', env=env) as process:
+            with tempfile.TemporaryFile() as stderr_file, subprocess.Popen(
+                    args, cwd=cwd or self.root, stdout=subprocess.PIPE,
+                    stderr=stderr_file if stdout_only else subprocess.STDOUT,
+                    text=True, encoding='utf-8', errors='replace', env=env) as process:
                 import threading
                 timed_out = []
                 def expire():
@@ -87,6 +88,10 @@ class Run:
                         if len(output) > 4000:
                             del output[:2000]
                     code = process.wait()
+                    if stdout_only:
+                        stderr_file.seek(0)
+                        for line in stderr_file.read().decode('utf-8', errors='replace').splitlines():
+                            self.say(line)
                 finally:
                     if timer:
                         timer.cancel()
@@ -100,7 +105,7 @@ class Run:
             time.sleep(attempt*2)
 
     def git(self, *args, cwd=None, retry=False):
-        return self.command(['git', *args], cwd=cwd, retry=retry, timeout=180 if retry else 60)
+        return self.command(['git', *args], cwd=cwd, retry=retry, timeout=180 if retry else 60, stdout_only=True)
 
 
 @contextlib.contextmanager
