@@ -32,6 +32,8 @@ def import_graph(source, output, limit=None):
             for key in ('position','binder','role','via_proj'):
                 if key in e: edge[key]=e[key]
             edges.append(edge);counts[kind]+=1
+    if not nodes:
+        raise ValueError('Export contains no declarations; previous mathematics preserved')
     ids={n['id'] for n in nodes}
     # Retain edges to external declaration references; consumers can identify unresolved endpoints.
     output.parent.mkdir(parents=True,exist_ok=True)

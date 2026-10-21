@@ -1,44 +1,95 @@
-# ALJABR — Mathlib-only prototype
+# ALJABR
 
-This revision **does not include** the hand-built ALJABR graph. Every mathematical node and edge displayed comes from Lean Graph's Mathlib extraction. The initial coverage is correctly ZERO until a real import succeeds. No synthetic data or bundled fake examples.
+Mathlib mathematics imported from Lean Graph, with a searchable offline browser.
+The bundled browser starts with zero declarations until a real import succeeds.
 
-## Two buttons
+## Start here on Windows
 
-1. **`1_UPDATE_MATHEMATICS.bat`** — download/update Mathlib and Lean Graph, extract a fresh NDJSON graph, import it, rebuild the UI data. Requires **Git and Python 3**. If Lean 4 (elan/Lake) is absent, the launcher downloads and installs it automatically for your Windows user. No virtual environment is created. This is a substantial download/build (several GB). It does not create a Python venv or install pip packages. If Lean Graph and the latest Mathlib are incompatible, this step may require adjusting versions. The Windows integration has not yet been verified end to end.
-2. **`2_OPEN_ALJABR.bat`** — open the HTML UI. Works without Python if the prebuilt JS file is present.
+Double-click **PULL_AND_RUN.bat** in this folder. It:
 
-Alternative: drag an **existing Lean Graph unified `.ndjson` export** onto `1_UPDATE_MATHEMATICS.bat`. This skips Git/Lean compilation and only requires Python 3. Exports are created by the author's `lake exe graph --mode unified --to Mathlib output.ndjson` command.
+1. Fetches `foreandr/ALJABR` and fast-forwards `main` to the newest code.
+2. Installs Lean through the official elan installer if Lake is missing.
+3. Fetches compatible Mathlib and Lean Graph sources, obtains the Mathlib cache,
+   checks the dependency lock, builds the extractor, and exports real mathematics.
+4. Imports and builds the browser data in a staging directory before replacing
+   the previous dataset. A failed import/build leaves previous good data intact.
+5. Saves detailed local logs and uploads a compact report to the GitHub
+   **diagnostics** branch, on success or failure.
 
-## Coverage
+Then double-click **2_OPEN_ALJABR.bat** to open the browser. Opening needs no
+mathematics update and does not run the pull-and-build process.
 
-Top bar shows **actual declaration count**, **dependency count**, **structure/class count**, and import status. These measure the imported collection, not a percentage of all mathematical ideas. Existing ALJABR curated structures/construction routes are intentionally absent.
+Git and Python 3.9+ must be installed and on PATH. No Python packages or virtual
+environment are needed. The initial Lean/Mathlib download and build can take a
+long time and many gigabytes; subsequent runs reuse the local tools and cache.
+The launcher waits for builds rather than declaring a slow build failed.
 
-## Data
+## What gets updated
 
-- `import_lean.py`: NDJSON to `data/lean_import.json` (preserves source names and typed edges).
-- `build.py`: produces offline-loadable `aljabr-data.js`.
-- `aljabr.html`: searchable UI for the imported graph.
-- `setup_lean.py`: attaches the extractor to a Mathlib checkout.
+ALJABR always fetches the newest `main` code. Lean Graph fetches its newest `main`
+code. Mathlib stays on the compatible **v4.29.0** release, matching Lean Graph's
+Lean toolchain. Each click re-extracts that mathematics; it does not claim to
+follow Mathlib's incompatible latest development branch. A mismatched toolchain
+or a changed dependency revision stops with an explicit error.
 
-Data is written atomically after successful conversion. Failed extraction leaves the last successful JSON/JS unchanged. Original ALJABR is not reconstructed unless Lean Graph contains corresponding formal declarations; visual semantics such as hand-crafted alternative construction routes do not automatically reappear.
+The upstream command is `lake exe graph --mode unified --to Mathlib output.ndjson`.
+Sources: [Lean Graph](https://github.com/aurasoph/lean-graph) and
+[Mathlib](https://github.com/leanprover-community/mathlib4), both Apache 2.0.
 
-Sources: https://github.com/aurasoph/lean-graph ; https://github.com/leanprover-community/mathlib4 . Both upstream projects use Apache 2.0 licensing.
+## Local work and recovery
 
-## Automatic Lean setup
+The launcher uses a process lock to prevent two ALJABR updaters running together.
+Git synchronization uses bounded network retries and fast-forward updates. It
+never force-pulls, hard-resets, auto-stashes source edits, or force-pushes.
+Commit/stash your source edits and push/reconcile local commits before running.
+Untracked files are retained; Git stops if they would be overwritten by a pull.
 
-Launcher 1 calls `install_lean.ps1` only when Lake is missing. It downloads the official elan installer over HTTPS from `https://elan.lean-lang.org/elan-init.ps1`, installs it into the normal user directory, and adds `%USERPROFILE%\.elan\bin` to the current launcher PATH immediately (no terminal restart). A compatible Lean toolchain is then selected via the Mathlib repository’s pinned `lean-toolchain` file. Requires an Internet connection.
+The generated `aljabr-data.js` is backed up under the current `logs/` run before
+pulling, then restored so a code update does not erase your current mathematics.
+Generated files under `tools/`, `data/`, and `logs/` are ignored. Do not commit the
+large mathematics or raw build logs. The legacy **1_UPDATE_MATHEMATICS.bat**
+updates mathematics without pulling ALJABR. You can still drag a real Lean Graph
+NDJSON export onto it to import without a Lean build.
 
-## v5 installer fix
-The automatic Lean installer now invokes the downloaded PowerShell script directly in the same process, ensuring its Boolean NoPrompt parameter is passed as a Boolean rather than the string from `powershell.exe -File`. No venv required.
+Before updating an existing Mathlib checkout, the launcher backs up its local
+Lake configuration/manifest changes to the current run's log folder, then
+restores those generated configuration files. Other Mathlib source edits and
+all Lean Graph edits cause it to stop. An interrupted clone can leave an
+incomplete tools folder; rename that folder and retry to preserve it for review.
 
-## v6 compatibility fix
-Your v5 log showed LeanGraph/MainGraph.lean failing to compile against Mathlib's Lean v4.36.0-rc1. The upstream Lean Graph repository currently specifies `leanprover/lean4:v4.29.0`. v6 pins Mathlib4 to its `v4.29.0` tag, allowing Lake to install and use the matching Lean version automatically. The installer no longer follows Mathlib `master` blindly.
+## Logs for debugging
 
-If you still have v5's `tools` directory, you can copy it into this release to reuse the Lean Graph checkout; the updater switches Mathlib to v4.29.0 and downloads only the cache for that version. Do not copy the old `data/mathlib_unified.ndjson` as if it were a completed extract.
+Read [diagnostics/README.md](diagnostics/README.md). The GitHub diagnostics branch
+contains `latest.json` (command arguments, durations, exit codes, versions and
+revisions) and `latest.log` (last 80 output lines). The mathematics worker's
+commands are nested under `mathematics.commands` in the report.
 
-**Note:** This patch is based on upstream version metadata and your log; the full Windows extraction has not yet been run successfully in this environment.
+Full timestamped output streams live under `logs/<UTC timestamp>-<process>/`.
+Each process rotates eight 4 MiB log parts; previous run folders remain available
+locally. `summary.json` and `mathematics.json` retain structured command history.
+If upload fails, reports remain under local `diagnostics/` and the full log
+explains the upload error. An upload failure does not erase or invalidate a
+successful mathematics update. Public users need write credentials only to
+publish reports. Logs include local paths and upstream build output.
 
-## v7 lockfile fix
-Version 6 used plain `lake update`, which upgraded Mathlib's dependencies from the historical v4.29.0 manifest and then switched the compiler to v4.36.0-rc1. Version 7 runs a targeted `lake update leanGraph --keep-toolchain` and checks every original Mathlib dependency revision afterward. It will stop with a clear message rather than compile mismatched versions if Lake updates anything unexpectedly.
+Useful options (run in this folder):
 
-**For v6 users:** Copy your `tools` folder into this v7 folder. The launcher restores Mathlib's versioned Lake configuration/manifest with `git checkout` and obtains precompiled artifacts for the pinned version. Do not manually run plain `lake update` in the Mathlib directory.
+```text
+PULL_AND_RUN.bat --check
+PULL_AND_RUN.bat --no-publish
+PULL_AND_RUN.bat --update-only
+PULL_AND_RUN.bat --import-file "C:\path\to\real-export.ndjson"
+```
+
+`--check` only checks Python and Git and writes local diagnostics. It does not
+pull, build, import mathematics, or upload. Set `ALJABR_NO_PAUSE=1` for unattended
+runs. Exit code 0 means the requested operation succeeded; 1 means attention is
+needed. Python bootstrap errors are recorded in `logs/bootstrap.log`.
+
+## Validation
+
+`py -3 -m unittest discover -s tests -v` exercises real local Git fast-forward
+updates, protection of local edits/generated data, imports, failure preservation,
+publication rollback, process locking and command failure reports. It uses
+small temporary test fixtures, never the production mathematics dataset.
+A full Lean/Mathlib build is a separate, substantial end-to-end operation.
