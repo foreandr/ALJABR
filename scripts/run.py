@@ -60,7 +60,7 @@ class Run:
             # Network commands use bounded retries/timeouts. Builds stream until completion.
             output = []
             env = dict(os.environ, GIT_TERMINAL_PROMPT='0', PYTHONUNBUFFERED='1',
-                       GCM_INTERACTIVE='Never')
+                       GCM_INTERACTIVE='Never', GIT_LFS_SKIP_SMUDGE='1')
             with subprocess.Popen(args, cwd=cwd or self.root, stdout=subprocess.PIPE,
                                   stderr=subprocess.STDOUT, text=True, encoding='utf-8',
                                   errors='replace', env=env) as process:
@@ -156,6 +156,27 @@ def sync(run):
     run.report['aljabr_commit'] = run.git('rev-parse', 'HEAD')
 
 
+def repair_missing_graph_assets(run, target):
+    """Restore missing optional LFS browser assets as pointers, without downloads.
+
+    Lean extraction uses source files, not the upstream explorer's databases.
+    Only unstaged deletions of LFS files under docs/data are recoverable here.
+    Modified files, staged edits, and source deletions are never overwritten.
+    """
+    status = run.git('status', '--porcelain', cwd=target)
+    for line in status.splitlines():
+        if not line.startswith(' D docs/data/'):
+            continue
+        path = line[3:]
+        if run.git('check-attr', 'filter', '--', path, cwd=target) != path + ': filter: lfs':
+            continue
+        run.say('Restoring missing optional Lean Graph LFS asset as a pointer: ' + path)
+        # Disable filters explicitly as well as setting SKIP_SMUDGE, so an
+        # unavailable LFS installation cannot break recovery of optional data.
+        run.git('-c', 'filter.lfs.process=', '-c', 'filter.lfs.smudge=',
+                '-c', 'filter.lfs.required=false', 'restore', '--worktree', '--', path, cwd=target)
+
+
 def update_math(run, source=None):
     root = run.root
     data = root / 'data'
@@ -189,6 +210,7 @@ def update_math(run, source=None):
                     run.git('fetch', '--depth', '1', 'origin', 'tag', branch, cwd=target, retry=True)
                     run.git('checkout', '--detach', 'tags/' + branch, cwd=target)
                 else:
+                    repair_missing_graph_assets(run, target)
                     status = run.git('status', '--porcelain', cwd=target)
                     if status:
                         # Reset only the index, never the worktree. This repairs the
@@ -217,6 +239,7 @@ def update_math(run, source=None):
                                         'another process may still own it.') from error
                                 run.say('Quarantined stale Lean Graph index.lock')
                             run.git('reset', '--mixed', 'HEAD', cwd=target)
+                            repair_missing_graph_assets(run, target)
                             status = run.git('status', '--porcelain', cwd=target)
                         if status:
                             raise RuntimeError('Lean Graph checkout contains genuine changes after index repair; refusing to overwrite them.')

@@ -122,6 +122,45 @@ class LauncherTests(unittest.TestCase):
             run.command([runner.sys.executable, '-c', 'raise SystemExit(7)'])
         self.assertEqual(run.report['commands'][-1]['exit_code'], 7)
 
+    def graph_assets(self):
+        self.seed()
+        assets = self.root/'docs'/'data'
+        assets.mkdir(parents=True)
+        (self.root/'.gitattributes').write_text('docs/data/*.db filter=lfs diff=lfs merge=lfs -text\n')
+        pointer = 'version https://git-lfs.github.com/spec/v1\noid sha256:' + 'a'*64 + '\nsize 987654321\n'
+        database = assets/'type-deps.db'
+        database.write_text(pointer)
+        self.git('add', '.gitattributes', 'docs/data/type-deps.db')
+        self.git('commit', '-m', 'optional LFS explorer data')
+        return database, pointer
+
+    def test_missing_optional_lfs_database_recovers_without_smudge(self):
+        database, pointer = self.graph_assets()
+        database.unlink()
+        # Simulate a broken/unavailable LFS filter. Recovery must bypass it.
+        self.git('config', 'filter.lfs.process', 'nonexistent-aljabr-lfs-command')
+        self.git('config', 'filter.lfs.required', 'true')
+        runner.repair_missing_graph_assets(runner.Run(self.root), self.root)
+        self.assertEqual(database.read_text(), pointer)
+        self.git('config', '--unset', 'filter.lfs.process')
+        self.git('config', '--unset', 'filter.lfs.required')
+        self.assertEqual(self.git('status', '--porcelain'), '')
+
+    def test_optional_asset_recovery_preserves_real_edits_and_source_deletions(self):
+        database, pointer = self.graph_assets()
+        database.write_text('my local database edits')
+        (self.root/'code.txt').unlink()
+        runner.repair_missing_graph_assets(runner.Run(self.root), self.root)
+        self.assertEqual(database.read_text(), 'my local database edits')
+        self.assertFalse((self.root/'code.txt').exists())
+
+    def test_optional_asset_recovery_preserves_staged_deletion(self):
+        database, pointer = self.graph_assets()
+        self.git('rm', 'docs/data/type-deps.db')
+        runner.repair_missing_graph_assets(runner.Run(self.root), self.root)
+        self.assertFalse(database.exists())
+        self.assertIn('D  docs/data/type-deps.db', self.git('status', '--porcelain'))
+
     def test_diagnostics_upload_creates_and_advances_separate_branch(self):
         remote = self.seed()
         (self.root/'diagnostics').mkdir()

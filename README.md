@@ -39,6 +39,10 @@ Sources: [Lean Graph](https://github.com/aurasoph/lean-graph) and
 ## Local work and recovery
 
 The launcher uses a process lock to prevent two ALJABR updaters running together.
+Optional Lean Graph explorer databases use Git LFS. The updater skips their
+large downloads, and restores missing LFS files under `docs/data/` as pointers.
+They are not needed for mathematical extraction. Modified assets, staged
+deletions, and deleted source files are still preserved and reported as edits.
 Git synchronization uses bounded network retries and fast-forward updates. It
 never force-pulls, hard-resets, auto-stashes source edits, or force-pushes.
 Commit/stash your source edits and push/reconcile local commits before running.
