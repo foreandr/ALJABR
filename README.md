@@ -121,3 +121,18 @@ updates, protection of local edits/generated data, imports, failure preservation
 publication rollback, process locking and command failure reports. It uses
 small temporary test fixtures, never the production mathematics dataset.
 A full Lean/Mathlib build is a separate, substantial end-to-end operation.
+
+## Original construction interface
+
+The home page is the exact October 14, 2026 baseline HTML supplied by the owner.
+Its layered graph, construction methods, pan/zoom, trace slider, and inspector
+remain intact. These original construction routes are curated explanations,
+not automatically inferred from Lean dependency edges.
+
+The inspector's **Explore Lean dependencies** link and search for imported
+names open the complete local dataset using the same canvas and inspector
+styling. The imported graph uses directed, layered dependencies, supports
+selection, pan/zoom, history and tracing, and bounds each view to 70 nodes.
+The route selector is disabled there because the export does not encode
+alternative construction methods. All 28 million edges remain in SQLite.
+No mathematics rebuild is needed for interface changes.

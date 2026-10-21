@@ -1,99 +1,100 @@
-/* Complete atlas: load search results and one neighborhood at a time. */
+/* Imported Lean graph in the October 14 canvas and inspector. No synthetic routes. */
 (async () => {
   'use strict';
-  const data = window.ALJABR_DATA;
-  if (!data?.api) return;
-  const $ = id => document.getElementById(id), fmt = n => Number(n || 0).toLocaleString();
-  const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const meta = data.metadata;
-  $('sn').textContent = fmt(meta.declarations);
-  $('se').textContent = fmt(meta.dependencies);
-  $('ss').textContent = fmt((meta.by_decl_type.structure || 0) + (meta.by_decl_type.struct || 0) + (meta.by_decl_type.class || 0));
-  $('sourceStatus').textContent = 'Real Lean Graph import';
-  if (location.protocol === 'file:') {
-    $('message').textContent = 'Open 2_OPEN_ALJABR.bat to explore the full mathematics atlas.';
-    return;
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fmt = n => Number(n || 0).toLocaleString();
+  const api = async path => { const r = await fetch('/api/' + path); if (!r.ok) throw Error(`Request failed (${r.status})`); return r.json(); };
+  const colors = {class:'#6cb4ff',struct:'#6cb4ff',axiom:'#7be0b4',thm:'#7be0b4'};
+  const color = n => colors[n.decl_type] || '#f0a15b';
+  let current, nodes = new Map(), edges = [], positions = new Map(), selected, generation = 0;
+  let depth = 1, focused = false, camera = {x:0,y:0,k:1}, drag, searchTimer, searchVersion = 0;
+  const cache = new Map();
+  const fetchNode = async id => { if (!cache.has(id)) { const result = await api('node?id=' + encodeURIComponent(id)); if (!result) throw Error('Declaration not found: ' + id); cache.set(id,result); if (cache.size > 150) cache.delete(cache.keys().next().value); } return cache.get(id); };
+  const apply = () => $('wd').setAttribute('transform', `translate(${camera.x} ${camera.y}) scale(${camera.k})`);
+  function fit() {
+    const points = [...positions.values()]; if (!points.length) return;
+    const minX = Math.min(...points.map(p=>p.x))-210, maxX = Math.max(...points.map(p=>p.x))+210;
+    const minY = Math.min(...points.map(p=>p.y))-60, maxY = Math.max(...points.map(p=>p.y))+60;
+    const w=$('cv').clientWidth, h=$('cv').clientHeight;
+    camera.k=Math.min(1,(w-60)/(maxX-minX),(h-160)/(maxY-minY));
+    camera.x=w/2-(minX+maxX)*camera.k/2; camera.y=90+(h-100)/2-(minY+maxY)*camera.k/2; apply();
   }
-  const request = async path => {
-    const response = await fetch(path);
-    if (!response.ok) throw new Error(`Atlas request failed: ${response.status}`);
-    return response.json();
-  };
-  let selected = null, history = [], current = null, results = [], sequence = 0;
-  const renderList = () => {
-    $('count').textContent = `First ${results.length} matching declarations (max 180 shown)`;
-    $('list').innerHTML = results.map(n => `<div class="item ${selected === n.id ? 'sel' : ''}" data-id="${esc(n.id)}">${esc(n.name)}<small>${esc(n.decl_type)} · ${esc(n.module)}</small></div>`).join('');
-  };
-  async function search() {
-    const token = ++sequence;
-    const found = await request('/api/search?' + new URLSearchParams({q: $('query').value.trim(), type: $('type').value}));
-    if (token !== sequence) return;
-    results = found;
-    renderList();
-  }
-  async function show(id, save = true) {
-    $('message').textContent = 'Loading declaration…';
-    const result = await request('/api/node?' + new URLSearchParams({id}));
-    if (!result) { $('message').textContent = 'Declaration not found in this export.'; return; }
-    if (save && selected) history.push(selected);
-    selected = id;
-    current = result;
-    renderList();
-    const n = result.node;
-    const outgoing = result.edges.filter(e => e.source === id).slice(0, 100);
-    const incoming = result.edges.filter(e => e.target === id).slice(0, 100);
-    const links = (edges, key) => edges.map(e => `<div class="dep" data-go="${esc(e[key])}">${esc(e[key].replace(/^lean:/, ''))} <span class="sub">${esc(e.kind)}</span></div>`).join('');
-    $('details').innerHTML = `<strong>${esc(n.name)}</strong><p class="muted">${esc(n.docstring || 'No documentation provided by exporter.')}</p><div class="tag">${esc(n.decl_type)}</div><div class="tag">${esc(n.module)}</div><h3>Dependencies (${fmt(result.out_count)})</h3>${links(outgoing, 'target')}<h3>Used by (${fmt(result.in_count)})</h3>${links(incoming, 'source')}`;
-    location.hash = encodeURIComponent(n.name);
-    $('message').textContent = '';
-    draw();
+  const chip = n => `<button class="chip" data-id="${esc(n.id)}" style="--c:${color(n)}">${esc(n.name)}</button>`;
+  function panel() {
+    const n=current.node;
+    const deps=[...new Set(current.edges.filter(e=>e.source===selected).map(e=>e.target))];
+    const users=[...new Set(current.edges.filter(e=>e.target===selected).map(e=>e.source))];
+    const lookup=new Map(current.nodes.map(n=>[n.id,n]));
+    $('ins').innerHTML=`<div class="k" style="color:${color(n)}">${esc(n.decl_type.toUpperCase())} · LEAN</div><h2>${esc(n.name)}</h2><p>${esc(n.docstring || n.module)}</p><div class="sc">Requires · ${fmt(current.out_count)} dependency edges</div>${deps.map(id=>lookup.has(id)?chip(lookup.get(id)):'').join('')}<div class="sc">Used by · ${fmt(current.in_count)} dependency edges</div>${users.map(id=>lookup.has(id)?chip(lookup.get(id)):'').join('')}<div class="l">The inspector loads up to 100 edges in each direction. The canvas traces up to 70 declarations, with 12 neighbors per direction at each step. Select a declaration to continue exploring.</div><div class="sc">Source</div><p>${esc(n.module)}</p><a class="chip" href="/aljabr.html">Construction atlas ↗</a>`;
   }
   function draw() {
-    const svg = $('graph'); svg.replaceChildren();
-    if (!current) return;
-    const lookup = new Map(current.nodes.map(n => [n.id, n]));
-    const filter = $('edges').value;
-    const available = current.edges.filter(e => !filter || e.kind === filter);
-    const outgoing = available.filter(e => e.source === selected).slice(0, 22);
-    const incoming = available.filter(e => e.target === selected).slice(0, 22);
-    const edges = [...outgoing, ...incoming];
-    const ids = [...new Set(edges.flatMap(e => [e.source, e.target]))].filter(id => id !== selected && lookup.has(id)).slice(0, 40);
-    const points = new Map([[selected, [475, 300]]]);
-    ids.forEach((id, i) => { const a = 2 * Math.PI * i / Math.max(ids.length, 1) - Math.PI / 2; points.set(id, [475 + Math.cos(a) * Math.min(325, Math.max(190, ids.length*8)), 300 + Math.sin(a) * Math.min(230, Math.max(150, ids.length*6))]); });
-    function element(type, attrs, parent = svg) {
-      const node = document.createElementNS('http://www.w3.org/2000/svg', type);
-      for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
-      parent.appendChild(node); return node;
-    }
-    for (const edge of edges) {
-      if (!points.has(edge.source) || !points.has(edge.target)) continue;
-      const a = points.get(edge.source), b = points.get(edge.target);
-      element('line', {x1:a[0], y1:a[1], x2:b[0], y2:b[1], class:'edge ' + edge.kind});
-    }
-    for (const [id, [x, y]] of points) {
-      const name = lookup.get(id).name;
-      const group = element('g', {class:id === selected ? 'core' : '', 'data-id':id});
-      element('rect', {x:x-94, y:y-20, width:188, height:40, rx:5}, group);
-      element('text', {x, y:y+4, 'text-anchor':'middle'}, group).textContent = name.length > 27 ? name.slice(0,25) + '…' : name;
-      group.addEventListener('click', () => show(id).catch(fail));
-    }
+    $('rg').innerHTML=''; $('sg').innerHTML='';
+    $('ed').innerHTML=edges.filter(e=>positions.has(e.source)&&positions.has(e.target)).map(e=>{
+      // Dependency points toward the declaration that requires it, as in the baseline.
+      const a=positions.get(e.target),b=positions.get(e.source),dir=b.x>=a.x?1:-1;
+      const ax=a.x+dir*180,bx=b.x-dir*180,m=(ax+bx)/2;
+      return `<path d="M${ax},${a.y} C${m},${a.y} ${m},${b.y} ${bx},${b.y}" fill="none" stroke="#8393b3" stroke-width="1.5" opacity=".65"><title>${esc(e.kind)}: ${esc(e.source)} depends on ${esc(e.target)}</title></path><polygon points="${bx},${b.y} ${bx-dir*8},${b.y-4} ${bx-dir*8},${b.y+4}" fill="#8393b3"/>`;
+    }).join('');
+    $('nd').innerHTML=[...nodes.values()].map(n=>{
+      const p=positions.get(n.id),c=n.id===selected?'#fbbf24':color(n);
+      const name=n.name.length>40?n.name.slice(0,37)+'…':n.name;
+      const shape=['class','struct'].includes(n.decl_type)?'<rect class="sh" x="-180" y="-30" width="360" height="60" rx="10"':n.decl_type==='axiom'||n.decl_type==='thm'?'<path class="sh" d="M-168 -30H168L180 -18V18L168 30H-168L-180 18V-18Z"':'<rect class="sh" x="-180" y="-30" width="360" height="60" rx="25"';
+      return `<g class="n" tabindex="0" role="button" aria-label="${esc(n.name)}" data-id="${esc(n.id)}" transform="translate(${p.x} ${p.y})"><title>${esc(n.name)}</title>${shape} fill="#101d35" stroke="${c}" stroke-width="${n.id===selected?2.5:1.5}"/><text y="-5" text-anchor="middle" fill="#e6ecf8" font-size="14" font-weight="600">${esc(name)}</text><text y="15" text-anchor="middle" fill="${c}" font-size="9" letter-spacing=".8">${esc(n.decl_type.toUpperCase())}</text></g>`;
+    }).join('');
   }
-  function fail(error) { $('message').textContent = error.message + '. Reopen 2_OPEN_ALJABR.bat if needed.'; }
-  let timer;
-  $('query').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => search().catch(fail), 250); });
-  $('type').addEventListener('change', () => search().catch(fail));
-  $('edges').addEventListener('change', draw);
-  $('reset').onclick = draw;
-  $('back').onclick = () => { if (history.length) show(history.pop(), false).catch(fail); };
-  $('list').onclick = e => { const item = e.target.closest('[data-id]'); if (item) show(item.dataset.id).catch(fail); };
-  $('details').onclick = e => { const item = e.target.closest('[data-go]'); if (item) show(item.dataset.go).catch(fail); };
-  try {
-    await search();
-    if (location.hash) await show('lean:' + decodeURIComponent(location.hash.slice(1)), false);
-    else {
-      const candidates = await request('/api/search?q=Module&type=class');
-      const first = candidates.find(n => n.name === 'Module') || results[0];
-      if (first) await show(first.id, false);
-    }
-  } catch (error) { fail(error); }
+  async function select(id,push=true) {
+    const token=++generation;
+    $('mt').textContent='Loading dependencies…';
+    try {
+      const root=await fetchNode(id); if(token!==generation)return;
+      const nextNodes=new Map([[id,root.node]]), nextEdges=new Map(), cols=new Map([[id,0]]), queue=[{id,level:0}], seen=new Set();
+      let calls=0;
+      while(queue.length && calls<20 && nextNodes.size<70) {
+        const q=queue.shift(); if(seen.has(q.id)||q.level>=depth)continue; seen.add(q.id);
+        const data=await fetchNode(q.id); calls++; if(token!==generation)return;
+        const lookup=new Map(data.nodes.map(n=>[n.id,n]));
+        const outgoing=data.edges.filter(e=>e.source===q.id), incoming=focused?[]:data.edges.filter(e=>e.target===q.id);
+        for(const [list,direction] of [[outgoing,-1],[incoming,1]]) {
+          const neighbors=new Set();
+          for(const edge of list) {
+            const other=direction<0?edge.target:edge.source;
+            if(!lookup.has(other))continue;
+            if(!neighbors.has(other)&&neighbors.size>=12)continue;
+            neighbors.add(other);
+            if(!nextNodes.has(other)) { if(nextNodes.size>=70)continue; nextNodes.set(other,lookup.get(other));cols.set(other,cols.get(q.id)+direction);queue.push({id:other,level:q.level+1}); }
+            nextEdges.set(JSON.stringify([edge.source,edge.target,edge.kind]),edge);
+          }
+        }
+      }
+      if(token!==generation)return;
+      selected=id;current=root;nodes=nextNodes;edges=[...nextEdges.values()];positions=new Map();
+      const groups=new Map();for(const [key,col] of cols){if(!groups.has(col))groups.set(col,[]);groups.get(col).push(key);}
+      for(const [col,ids] of groups)ids.forEach((key,i)=>positions.set(key,{x:col*490,y:(i-(ids.length-1)/2)*100}));
+      if(push)history.pushState({lean:id},'', '/aljabr.html?lean='+encodeURIComponent(id));
+      $('methodCount').textContent=fmt(nodes.size)+' nodes';$('mt').textContent='Imported dependency graph';
+      draw();panel();fit();
+    }catch(error){if(token!==generation)return;console.error('ALJABR graph load',error);$('mt').textContent='Could not load graph';$('ins').innerHTML=`<h2>Unable to load</h2><p>${esc(error.message)}</p><a href="/aljabr.html">Return to construction atlas</a>`;}
+  }
+  $('dp').value=depth;$('dv').textContent=depth;$('dp').oninput=e=>{depth=+e.target.value;$('dv').textContent=depth;select(selected,false);};
+  $('focus').textContent='All branches';$('focus').setAttribute('aria-pressed','false');$('focus').title='Toggle dependencies only';
+  $('focus').onclick=()=>{focused=!focused;$('focus').textContent=focused?'Focused ✓':'All branches';$('focus').setAttribute('aria-pressed',String(focused));select(selected,false);};
+  for(const id of ['mp','mn','methodsList']){$(id).disabled=true;$(id).title='Construction routes are available in the curated atlas; Lean edges do not encode alternative construction methods.';}
+  $('bk').onclick=()=>history.back();$('fw').onclick=()=>history.forward();
+  addEventListener('popstate',()=>select(new URLSearchParams(location.search).get('lean')||'lean:Module',false));
+  $('rn').onclick=()=>{const choices=[...nodes.keys()].filter(id=>id!==selected);if(choices.length)select(choices[Math.floor(Math.random()*choices.length)]);};
+  $('ins').onclick=e=>{const b=e.target.closest('[data-id]');if(b)select(b.dataset.id);};
+  $('tg').onclick=()=>$('ins').classList.toggle('o');
+  $('sv').onkeydown=e=>{const n=e.target.closest('[data-id]');if(n&&['Enter',' '].includes(e.key)){e.preventDefault();select(n.dataset.id);}};
+  $('cv').onpointerdown=e=>{if(e.target.closest('#bar,#vp'))return;const n=e.target.closest('[data-id]');drag={x:e.clientX,y:e.clientY,cx:camera.x,cy:camera.y,id:n?.dataset.id,moved:false};$('cv').setPointerCapture(e.pointerId);};
+  $('cv').onpointermove=e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.hypot(dx,dy)>5)drag.moved=true;camera.x=drag.cx+dx;camera.y=drag.cy+dy;apply();};
+  $('cv').onpointerup=()=>{if(drag?.id&&!drag.moved)select(drag.id);drag=null;};$('cv').onpointercancel=()=>drag=null;
+  $('cv').addEventListener('wheel',e=>{if(e.target.closest('#bar,#vp'))return;e.preventDefault();const r=$('cv').getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top,k=Math.min(3,Math.max(.03,camera.k*Math.exp(-e.deltaY*.0015)));camera.x=x-(x-camera.x)*k/camera.k;camera.y=y-(y-camera.y)*k/camera.k;camera.k=k;apply();},{passive:false});
+  $('q').oninput=()=>{const token=++searchVersion;clearTimeout(searchTimer);searchTimer=setTimeout(async()=>{try{const rows=await api('search?q='+encodeURIComponent($('q').value));if(token===searchVersion)$('nl').innerHTML=rows.map(n=>`<option value="${esc(n.name)}">${esc(n.decl_type)}</option>`).join('');}catch(e){console.error('ALJABR search',e);}},220);};
+  $('q').onchange=async()=>{try{const value=$('q').value.trim(),rows=await api('search?q='+encodeURIComponent(value)),n=rows.find(n=>n.name.toLowerCase()===value.toLowerCase())||rows[0];if(n){select(n.id);$('q').value='';}else{$('q').setCustomValidity('No matching declaration');$('q').reportValidity();}}catch(e){console.error(e);}};
+  $('q').addEventListener('input',()=>$('q').setCustomValidity(''));
+  $('vb').onclick=()=>$('vp').classList.toggle('o');
+  addEventListener('resize',fit);addEventListener('keydown',e=>{if(e.key==='/'&&e.target.tagName!=='INPUT'){e.preventDefault();$('q').focus();}if(e.key==='Escape')$('vp').classList.remove('o');});
+  try {const health=await api('health');$('vb').textContent='⊢ '+fmt(health.metadata.declarations);$('vp').textContent=fmt(health.metadata.declarations)+' declarations · '+fmt(health.metadata.dependencies)+' dependency edges. Complete data stored locally; canvas loads bounded neighborhoods.';}catch(e){console.error(e);}
+  await select(new URLSearchParams(location.search).get('lean')||'lean:Module',false);
 })();

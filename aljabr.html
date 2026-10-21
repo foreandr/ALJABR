@@ -1,11 +1,741 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>ALJABR — Mathlib Atlas</title><style>
-:root{font-family:Arial,Helvetica,sans-serif;color:#dce6f4;background:#0c1421;font-size:14px}*{box-sizing:border-box}body{margin:0}header{padding:13px 20px;border-bottom:1px solid #29405b;display:flex;align-items:center;gap:20px;flex-wrap:wrap;background:#121e2d}header strong{letter-spacing:.11em;font-size:18px}header .info{font-size:12px;color:#97adc6}#stats{margin-left:auto;display:flex;gap:15px;flex-wrap:wrap;font-size:12px}#stats b{color:#c7e3ff;font-size:17px}main{display:grid;grid-template-columns:285px minmax(0,1fr) 330px;height:calc(100vh - 69px);min-height:540px}aside,.detail{padding:15px;border-right:1px solid #29405b;overflow:auto}.detail{border-left:1px solid #29405b;border-right:0}input,select,button{background:#1b2e45;color:#e3edfa;border:1px solid #3b5574;border-radius:4px;padding:9px;font:inherit}input{width:100%}button{cursor:pointer}button:hover,.item:hover{background:#264361}#list{margin-top:12px}.item{padding:9px;border-bottom:1px solid #233750;cursor:pointer;overflow-wrap:anywhere}.item.sel{background:#243e59;border-left:3px solid #e9bf63}.item small{display:block;color:#8fa5bc;margin-top:3px}#canvas{overflow:hidden;position:relative;background-color:#0c1421;background-image:radial-gradient(#203147 1px,transparent 1px);background-size:23px 23px}svg{width:100%;height:100%;touch-action:none}svg text{fill:#e2ebf9;font:12px Arial;pointer-events:none}svg .edge{stroke:#6686ac;stroke-width:1.4;opacity:.65}svg .edge.extends{stroke:#e0b768;stroke-width:2.3;opacity:.95}svg rect{fill:#192a40;stroke:#6886a8;stroke-width:1.2;cursor:pointer}svg g.core rect{stroke:#ebc36d;stroke-width:2.5;fill:#334153}svg g:hover rect{fill:#3a5271}.toolbar{position:absolute;top:10px;left:10px;display:flex;gap:6px}h3{margin:7px 0 14px}p{line-height:1.5}.muted{color:#92a9c4}.tag{display:inline-block;padding:3px 6px;border:1px solid #3d5470;margin:2px;border-radius:3px;font-size:12px}.dep{display:block;padding:7px 4px;color:#badafe;cursor:pointer;overflow-wrap:anywhere;border-bottom:1px solid #283a50}#message{position:absolute;top:55px;left:12px;right:12px;text-align:center;color:#a7bed8;pointer-events:none}.sub{font-size:11px;color:#8499b1}@media(max-width:950px){main{grid-template-columns:210px minmax(0,1fr)}.detail{grid-column:1/-1;border-top:1px solid #29405b;max-height:280px}main{height:auto}#canvas{height:470px}} </style></head>
-<body><header><div><strong>ALJABR</strong><div class="info">Mathlib · Lean Graph · Formal dependency atlas</div></div><div id="stats"><span><b id="sn">0</b> declarations</span><span><b id="se">0</b> dependencies</span><span><b id="ss">0</b> structures/classes</span><span id="sourceStatus">Not imported</span></div></header>
-<main><aside><h3>Explore mathematics</h3><input id="query" placeholder="Find a declaration…" autofocus><div style="display:flex;gap:6px;margin-top:8px"><select id="type"><option value="">All declaration types</option><option value="structure">Structures</option><option value="class">Classes</option><option value="thm">Theorems</option><option value="def">Definitions</option><option value="inst">Instances</option><option value="axiom">Axioms</option><option value="inductive">Inductive</option></select></div><div id="count" class="sub" style="padding-top:12px"></div><div id="list"></div></aside><section id="canvas"><div class="toolbar"><button id="back">← Back</button><button id="reset">Fit</button><select id="edges"><option value="">All edges</option><option value="extends">Inheritance</option><option value="field">Fields</option><option value="sig">Signatures</option><option value="proof">Proofs</option><option value="def">Definitions</option><option value="docref">Documentation</option></select></div><div id="message"></div><svg id="graph" viewBox="0 0 950 620" aria-label="Interactive dependency graph"></svg></section><section class="detail"><h3>Declaration inspector</h3><div id="details" class="muted">Select a declaration to inspect its Mathlib dependencies.</div></section></main><script src="aljabr-data.js"></script><script>
-(()=>{'use strict';const d=window.ALJABR_DATA||{nodes:[],edges:[],metadata:{}};const $=id=>document.getElementById(id),nodes=d.nodes||[],edges=d.edges||[],lookup=new Map(nodes.map(n=>[n.id,n])),out=new Map(),incoming=new Map();for(const e of edges){if(!out.has(e.source))out.set(e.source,[]);out.get(e.source).push(e);if(!incoming.has(e.target))incoming.set(e.target,[]);incoming.get(e.target).push(e)}const fmt=n=>Number(n||0).toLocaleString();$('sn').textContent=fmt(nodes.length);$('se').textContent=fmt(edges.length);$('ss').textContent=fmt(nodes.filter(n=>['structure','class'].includes(n.decl_type)).length);$('sourceStatus').textContent=nodes.length?'Real Lean Graph import':'No Mathlib imported';let selected=null,history=[];let filter='',edgeFilter='';const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function search(){const term=$('query').value.trim().toLowerCase(),type=$('type').value;let found=[];for(const n of nodes){if(type&&n.decl_type!==type)continue;if(term&&!n.name.toLowerCase().includes(term))continue;found.push(n);if(found.length>=180)break} $('count').textContent=nodes.length?`First ${found.length} matching declarations (max 180 shown)`:'No imported data yet';$('list').innerHTML=found.map(n=>`<div class="item ${selected===n.id?'sel':''}" data-id="${esc(n.id)}">${esc(n.name)}<small>${esc(n.decl_type)} · ${esc(n.module)}</small></div>`).join('');}
-function show(id,save=true){if(!lookup.has(id))return;if(save&&selected)history.push(selected);selected=id;search();const n=lookup.get(id);const outs=(out.get(id)||[]),ins=(incoming.get(id)||[]);const group=es=>es.slice(0,100).map(e=>`<div class="dep" data-go="${esc(e.target)}">${esc(e.target.replace(/^lean:/,''))} <span class="sub">${esc(e.kind)}</span></div>`).join('');$('details').innerHTML=`<strong>${esc(n.name)}</strong><p class="muted">${esc(n.docstring||'No documentation provided by exporter.')}</p><div class="tag">${esc(n.decl_type)}</div><div class="tag">${esc(n.module)}</div><h3>Dependencies (${fmt(outs.length)})</h3>${group(outs)}<h3>Used by (${fmt(ins.length)})</h3>${ins.slice(0,100).map(e=>`<div class="dep" data-go="${esc(e.source)}">${esc(e.source.replace(/^lean:/,''))} <span class="sub">${esc(e.kind)}</span></div>`).join('')}`;draw();location.hash=encodeURIComponent(n.name)}
-function draw(){const svg=$('graph');svg.replaceChildren();if(!selected){$('message').textContent=nodes.length?'Search or click a declaration to explore.':'No Mathlib graph imported. Run 1_UPDATE_MATHEMATICS.bat first.';return}$('message').textContent='';let outgoing=(out.get(selected)||[]).filter(e=>!edgeFilter||e.kind===edgeFilter).slice(0,22),inbound=(incoming.get(selected)||[]).filter(e=>!edgeFilter||e.kind===edgeFilter).slice(0,22),ids=[...new Set([...outgoing.map(e=>e.target),...inbound.map(e=>e.source)])].filter(x=>lookup.has(x)&&x!==selected).slice(0,40);const total=ids.length,pts=new Map([[selected,[475,300]]]);ids.forEach((id,i)=>{let a=2*Math.PI*i/Math.max(total,1)-Math.PI/2;pts.set(id,[475+Math.cos(a)*Math.min(325,Math.max(190,total*8)),300+Math.sin(a)*Math.min(230,Math.max(150,total*6))])});const ns='http://www.w3.org/2000/svg',el=(type,attrs,parent=svg)=>{const n=document.createElementNS(ns,type);for(const [k,v] of Object.entries(attrs))n.setAttribute(k,String(v));parent.appendChild(n);return n};for(const e of [...outgoing,...inbound]){if(!pts.has(e.source)||!pts.has(e.target))continue;let a=pts.get(e.source),b=pts.get(e.target);el('line',{x1:a[0],y1:a[1],x2:b[0],y2:b[1],class:'edge '+e.kind})}for(const [id,[x,y]] of pts){const n=lookup.get(id),g=el('g',{class:id===selected?'core':'', 'data-id':id}),w=188;el('rect',{x:x-w/2,y:y-20,width:w,height:40,rx:5},g);let text=el('text',{x,y:y+4,'text-anchor':'middle'},g);const name=n.name.length>27?n.name.slice(0,25)+'…':n.name;text.textContent=name;g.addEventListener('click',()=>show(id))}}
-$('query').addEventListener('input',search);$('type').addEventListener('change',search);$('edges').addEventListener('change',e=>{edgeFilter=e.target.value;draw()});$('list').addEventListener('click',e=>{let x=e.target.closest('[data-id]');if(x)show(x.dataset.id)});$('details').addEventListener('click',e=>{let x=e.target.closest('[data-go]');if(x)show(x.dataset.go)});$('back').onclick=()=>{if(history.length)show(history.pop(),false)};$('reset').onclick=draw;search();if(nodes.length){let first=nodes.find(n=>/^(Module|Group|Ring|LinearMap)$/.test(n.name))||nodes.find(n=>n.decl_type==='structure')||nodes[0];show(first.id,false)}
-})();
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ALJABR</title>
+<style>
+:root{--bg:#0a1226;--pn:#0c162c;--ln:#22314f;--tx:#e6ecf8;--mu:#8393b3;--gold:#fbbf24}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font:13px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+#app{display:grid;grid-template-columns:1fr 320px;height:100%}
+#cv{position:relative;overflow:hidden;touch-action:none;cursor:grab;min-width:0}
+#cv.pan{cursor:grabbing}
+svg{width:100%;height:100%;display:block;user-select:none;-webkit-user-select:none}
+.n{cursor:pointer;outline:none}
+.n:focus-visible .sh{stroke:#fff;stroke-width:3}
+#bar{position:absolute;top:12px;left:14px;right:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;pointer-events:none}
+#bar>*{pointer-events:auto}
+button,input{font:inherit;color:inherit}
+.b{background:#12203d;border:1px solid var(--ln);border-radius:8px;padding:7px 13px;cursor:pointer;min-height:34px}
+.b:hover:not(:disabled),.b:focus-visible{border-color:var(--gold);outline:none}
+.b:disabled{opacity:.3;cursor:default}
+#brand{font:600 13px Georgia,serif;letter-spacing:.32em;margin-right:10px;color:#cfd9ee}
+#q{background:#0d1a34;border:1px solid var(--ln);border-radius:8px;padding:7px 11px;width:170px;min-height:34px}
+#q:focus{outline:none;border-color:var(--gold)}
+.dp{display:flex;gap:8px;align-items:center;color:var(--mu);background:#12203d;border:1px solid var(--ln);border-radius:8px;padding:0 12px;min-height:34px}
+.dp input{width:90px;accent-color:var(--gold)}
+#mw{padding:3px 5px;gap:5px;min-width:0;max-width:min(540px,calc(100vw - 40px));border-color:#4b3c17;box-shadow:0 0 0 1px #7b581d55}
+#mw .b{padding:2px 11px;min-height:30px;font-size:18px}
+#methodCount{color:#fbbf24;font-weight:800;white-space:nowrap;font-size:12px;background:#3b2c13;border:1px solid #956719;border-radius:6px;padding:5px 8px}
+#mt{color:#dbe5f7;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;max-width:245px;flex:1}
+#methodsList{white-space:nowrap;font-weight:700;color:#fbbf24;border-color:#8d661b;background:#2d2518}
+#methodMenu{position:absolute;left:175px;top:54px;z-index:8;max-width:min(650px,calc(100vw - 32px));width:480px;max-height:65vh;overflow:auto;background:#101d35;border:1px solid #a87923;border-radius:12px;padding:10px;box-shadow:0 18px 48px #0009;display:none}
+#methodMenu.open{display:block}
+#methodMenu header{display:flex;align-items:center;justify-content:space-between;padding:4px 6px 10px;font-weight:700;color:#fbbf24}
+.method-option{display:block;width:100%;text-align:left;padding:11px 12px;margin:5px 0;background:#14233e;border:1px solid #334462;border-radius:9px;cursor:pointer;color:#dbe5f7}
+.method-option:hover,.method-option.active{border-color:#fbbf24;background:#2a2b35}
+.method-option strong{display:block;font-size:13px;color:#fbbf24;margin-bottom:4px}
+.method-option small{display:block;font-size:11px;line-height:1.5;color:#c2cde0;white-space:normal}
+@media(max-width:900px){#methodMenu{left:12px;top:104px;width:calc(100vw - 24px)}#mw{max-width:100%}}
+#vb{margin-left:auto;font:12px ui-monospace,Menlo,monospace}
+#vp{position:absolute;top:56px;right:14px;background:#0d1a34;border:1px solid var(--ln);border-radius:10px;padding:10px 14px;font:11.5px ui-monospace,Menlo,monospace;display:none;z-index:4;line-height:1.7}
+#vp.o{display:block}
+#ins{background:var(--pn);border-left:1px solid var(--ln);padding:62px 20px 24px;overflow:auto}
+#ins h2{font:600 24px/1.15 Georgia,"Times New Roman",serif;margin:2px 0 8px}
+#ins p{margin:0 0 10px;color:#c3cee6}
+.k{font-size:11px;letter-spacing:.06em}
+.m{font:italic 13px Georgia,serif;letter-spacing:0}
+.sc{margin:18px 0 4px;color:var(--mu);font-size:11.5px}
+.rt{border:1px solid var(--ln);border-radius:10px;padding:9px 11px;margin:7px 0}
+.rt:hover{border-color:#fff4}
+.rh{display:flex;justify-content:space-between;font-weight:600;margin-bottom:3px}
+.rh span{font-weight:400;color:var(--mu);font-size:11.5px}
+.l{color:var(--mu);font-size:11.5px;margin-top:5px}
+.chip{background:#12203d;border:1px solid var(--c);border-radius:6px;padding:3px 9px;margin:3px 5px 2px 0;cursor:pointer}
+.chip:hover,.chip:focus-visible{background:#1a2c52;outline:none}
+.chip i{color:var(--mu);margin-left:6px;font:italic 12px Georgia,serif}
+details{margin:6px 0}summary{cursor:pointer;color:var(--mu)}
+code{display:block;white-space:pre-wrap;margin-top:5px;font:12.5px ui-monospace,Menlo,monospace;color:#d8e2f7;background:#0a1226;padding:7px 9px;border-radius:6px}
+.th{margin-top:14px;padding:8px 11px;border-left:2px solid var(--mu);color:var(--mu)}
+.ev{display:flex;gap:5px;align-items:center;margin-top:20px;color:var(--mu);font-size:11.5px}
+.ev b{width:8px;height:8px;border-radius:50%;border:1px solid var(--mu)}.ev b.f{background:var(--gold);border-color:var(--gold)}
+#tg{display:none}
+@media(max-width:820px){
+#app{grid-template-columns:1fr}
+#ins{position:absolute;right:0;top:0;bottom:0;width:min(320px,88vw);transform:translateX(100%);transition:transform .25s;z-index:5}
+#ins.o{transform:none}#tg{display:inline-block}#vb{margin-left:0}}
+@media(prefers-reduced-motion:reduce){#ins{transition:none}}
+</style></head><body>
+<div id="app">
+<div id="cv">
+<svg id="sv" role="application" aria-label="ALJABR mathematical dependency graph"><defs>
+<pattern id="dt" width="32" height="32" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#1b2a49"/></pattern>
+<filter id="gl" x="-40%" y="-60%" width="180%" height="220%"><feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="#fbbf24" flood-opacity=".75"/></filter></defs>
+<g id="wd"><rect x="-9000" y="-9000" width="26000" height="26000" fill="url(#dt)"/><g id="rg"></g><g id="ed"></g><g id="sg"></g><g id="nd"></g></g></svg>
+<div id="bar"><span id="brand">ALJABR</span>
+<button class="b" id="bk" aria-label="Back">‹ Back</button><button class="b" id="fw" aria-label="Forward">Forward ›</button>
+<button class="b" id="rn">Random</button><button class="b" id="focus" aria-pressed="true" title="Show the selected construction only">Focused ✓</button>
+<div class="dp" id="mw"><button class="b" id="mp" aria-label="Previous method">‹</button><span id="methodCount" aria-live="polite"></span><span id="mt"></span><button class="b" id="mn" aria-label="Next method">›</button><button class="b" id="methodsList" aria-label="Show all construction methods" aria-expanded="false">Routes ▾</button></div><div id="methodMenu" role="group" aria-label="Construction methods"></div>
+<input id="q" list="nl" placeholder="Search  /" aria-label="Search concepts"><datalist id="nl"></datalist>
+<label class="dp">Trace <input type="range" id="dp" min="1" max="12" value="10"><span id="dv">10</span></label>
+<button class="b" id="vb" aria-label="Validation report"></button><button class="b" id="tg" aria-label="Inspector">i</button></div>
+<div id="vp"></div></div>
+<aside id="ins" aria-live="polite"></aside></div>
+<script>
+const PURPLE='#c4a0ff';
+const K={S:'STRUCTURE',M:'MAP',A:'AXIOM'},C={S:'#6cb4ff',M:'#f0a15b',A:'#7be0b4'},GOLD='#fbbf24',CY='#22d3ee',PK='#f472b6';
+/* ---------- atlas model ---------- */
+const N={},L=[];
+const bd=x=>{const[a,b]=x.split('@');return[a,b.split(',')]};
+const D=(id,k,name,d,o={})=>{const n={id,k,name,d,ev:0,w:1,...o};
+if(o.dom){n.db=o.dom.map(x=>bd(x)[1]);n.dom=o.dom.map(x=>bd(x)[0]);n.cb=o.cod.map(x=>bd(x)[1]);n.cod=o.cod.map(x=>bd(x)[0])}
+if(!n.ty)n.ty=k=='S'&&n.pa.length==1?[id]:n.pa.map(()=>null);L.push(N[id]=n)};
+D('set','S','Set','Primitive collection of elements. Every carrier starts here.',{pa:['S'],w:4,fm:'x ∈ S'});
+D('binop','M','Binary operation','A map on one carrier. By itself it satisfies no axioms.',{pa:['S'],sig:'S × S → S',dom:['set@S','set@S'],cod:['set@S'],fm:'∗ : S × S → S'});
+D('assoc','A','Associativity','Grouping of repeated applications is irrelevant.',{pa:['S'],fm:'∀a,b,c : (a∗b)∗c = a∗(b∗c)'});
+D('ident','A','Identity element','A two-sided neutral element exists.',{pa:['S'],fm:'∃e ∀a : e∗a = a∗e = a'});
+D('inv','A','Inverses','Every element has a two-sided inverse.',{pa:['S'],fm:'∀a ∃a⁻¹ : a∗a⁻¹ = a⁻¹∗a = e'});
+D('magma','S','Magma','A set with a binary operation, with no axioms imposed on that operation.',{pa:['G'],w:3});
+D('semigroup','S','Semigroup','A set equipped with an associative binary operation.',{pa:['G'],w:3});
+D('monoid','S','Monoid','A semigroup equipped with a two-sided identity element.',{pa:['G'],w:4});
+D('group','S','Group','A monoid in which every element has a two-sided inverse.',{pa:['G'],w:6});
+D('comm','A','Commutativity','The operation does not depend on order.',{pa:['A'],fm:'∀a,b : a∗b = b∗a'});
+D('abgrp','S','Abelian group','A group whose operation is commutative. Written additively it is (V,+).',{pa:['A'],w:3});
+D('subtest','A','Subgroup test','Nonempty subset closed under the restricted operation and inverses.',{pa:['G','N'],fm:'N ≠ ∅ ∧ ∀a,b∈N : ab⁻¹ ∈ N'});
+D('subgroup','S','Subgroup','A subset N of a specified group G, with the operation restricted from G.',{pa:['G','N'],ty:['group',null],p:'N ≤ G',w:4});
+D('normality','A','Normality','Conjugation preserves the subgroup. Constrains an already chosen N ≤ G.',{pa:['G','N'],fm:'∀g∈G : gNg⁻¹ = N'});
+D('hom','M','Group homomorphism','Structure-preserving map between two groups. Not a self-map in general.',{pa:['G','H'],ty:['group','group'],sig:'f: G → H',dom:['group@G'],cod:['group@H'],lw:['homlaw'],fm:'f(ab) = f(a)f(b)'});
+D('homlaw','A','Homomorphism law','f preserves the operation. Without it, ker f and im f need not be subgroups.',{pa:['G','H'],fm:'∀a,b : f(ab) = f(a)f(b)'});
+D('cform','M','Coset formation','Restricts the operation of G to G × N. The cosets are its images gN.',{pa:['G','N'],sig:'G × N → G',dom:['group@G','subgroup@G,N'],cod:['group@G'],fm:'(g,n) ↦ gn,   gN = { gn : n ∈ N }'});
+D('normal','S','Normal subgroup','A subgroup of a specified G that is stable under conjugation.',{pa:['G','N'],ty:['group',null],p:'N ◁ G',w:6});
+D('cosets','S','Coset set','Cosets gN, formed by applying the operation of G to N. Depends on both G and N.',{pa:['G','N'],ty:['group',null],p:'G/N',fm:'G/N = { gN : g ∈ G }',w:3});
+D('wdef','A','Well-definedness','The product is independent of representatives. Normality guarantees it.',{pa:['G','N'],fm:'aN=a′N ∧ bN=b′N ⇒ abN = a′b′N'});
+D('cmul','M','Coset multiplication','Induced product on cosets.',{pa:['G','N'],sig:'G/N × G/N → G/N',dom:['cosets@G,N','cosets@G,N'],cod:['cosets@G,N'],lw:['wdef'],fm:'(aN)(bN) = (ab)N'});
+D('quotient','S','Quotient group','Cosets with the induced, well-defined operation.',{pa:['G','N'],ty:['group',null],p:'G/N',w:5,thm:'First isomorphism theorem: G/ker f ≅ H for surjective f. A characterization, not an input.'});
+D('qproj','M','Quotient projection','Canonical surjective homomorphism with kernel N.',{pa:['G','N'],sig:'q: G → G/N',dom:['group@G'],cod:['quotient@G,N'],der:'quotient',fm:'q(g) = gN,  ker q = N'});
+D('zero','A','Additive identity (zero)','The additive group has a unique identity 0. Inherited by all rings and modules.',{pa:['R'],fm:'∀a∈R: 0+a=a+0=a'});
+D('rassoc','A','Multiplicative associativity','Multiplication is associative; this is independent of additive associativity.',{pa:['R'],fm:'∀a,b,c∈R: (ab)c=a(bc)'});
+D('runit','A','Multiplicative identity','A distinguished element 1 is a two-sided identity. Unital-ring convention.',{pa:['R'],fm:'∃1∈R ∀a∈R: 1a=a1=a'});
+D('ldist','A','Left distributivity','Left multiplication distributes over addition.',{pa:['R'],fm:'∀a,b,c∈R: a(b+c)=ab+ac'});
+D('rdist','A','Right distributivity','Right multiplication distributes over addition.',{pa:['R'],fm:'∀a,b,c∈R: (a+b)c=ac+bc'});
+D('rmul','M','Ring multiplication','A second operation on the carrier of (R,+).',{pa:['R'],sig:'R × R → R',dom:['abgrp@R','abgrp@R'],cod:['abgrp@R'],lw:['rassoc','runit','ldist','rdist'],fm:'· : R × R → R'});
+D('ring','S','Ring','Abelian group under +, plus a unital multiplication that distributes over it.',{pa:['R'],w:4});
+D('mcomm','A','Multiplicative commutativity','Multiplication is commutative.',{pa:['R'],fm:'∀a,b : ab = ba'});
+D('cring','S','Commutative ring','A ring whose multiplication commutes. Operations are inherited.',{pa:['R'],w:3});
+D('nontriv','A','Nontriviality','Additive and multiplicative identities differ.',{pa:['F'],fm:'0 ≠ 1'});
+D('minv','A','Multiplicative inverses','Invertibility is a condition on the existing multiplication.',{pa:['F'],fm:'∀a≠0 ∃b : ab = 1'});
+D('field','S','Field','A commutative ring where every nonzero element is invertible and 0 ≠ 1.',{pa:['F'],w:6});
+D('moduleaction','M','Module action','Candidate scalar action of a unital ring R on the additive abelian group (M,+). Its compatibility is imposed separately.',{pa:['R','V'],sig:'R × V → V',dom:['ring@R','abgrp@V'],cod:['abgrp@V'],lw:['madd','radd','mcomp','munit'],fm:'(r,v) ↦ r·v'});
+D('madd','A','Module: vector additivity','Scalar multiplication preserves addition of module elements.',{pa:['R','V'],fm:'∀r∈R, m,n∈M: r(m+n)=rm+rn'});
+D('radd','A','Module: scalar additivity','Addition in the scalar ring is respected.',{pa:['R','V'],fm:'∀r,s∈R,m∈M: (r+s)m=rm+sm'});
+D('mcomp','A','Module: action associativity','Module action respects scalar multiplication in R.',{pa:['R','V'],fm:'∀r,s∈R,m∈M: (rs)m=r(sm)'});
+D('munit','A','Module: unit action','The scalar identity acts as the identity on every module element.',{pa:['R','V'],fm:'∀m∈M: 1_R m=m'});
+D('module','S','Left module','An abelian group with a unital associative left action by a ring satisfying both additive laws.',{pa:['R','V'],ty:['ring','abgrp'],p:'left R-module M',w:6});
+D('vspace','S','Vector space','A unital left module over a field. The field restriction is the additional structure on the scalar ring, not a second scalar action.',{pa:['F','V'],ty:['field','abgrp'],p:'V over F',w:6,thm:'Every left module over a field is a vector space. Equivalently the scalar action induces a unital ring homomorphism F → End(V,+).'});
+
+/* ---------- general algebra over a field: no associativity or unit assumed ---------- */
+D('algleftdist','A','Algebra: left distributivity','The internal product distributes over addition in its second argument.',{pa:['F','V'],fm:'∀x,y,z∈V: B(x,y+z)=B(x,y)+B(x,z)'});
+D('algrightdist','A','Algebra: right distributivity','The internal product distributes over addition in its first argument.',{pa:['F','V'],fm:'∀x,y,z∈V: B(x+y,z)=B(x,z)+B(y,z)'});
+D('algleftscalar','A','Algebra: scalar in first slot','Multiplying the first argument by a scalar from F scales the result.',{pa:['F','V'],fm:'∀a∈F, x,y∈V: B(ax,y)=aB(x,y)'});
+D('algrightscalar','A','Algebra: scalar in second slot','Multiplying the second argument by a scalar from F scales the result.',{pa:['F','V'],fm:'∀a∈F, x,y∈V: B(x,ay)=aB(x,y)'});
+D('bilinear','M','Algebra multiplication','A new internal product on the existing F-vector space V. The four explicit bilinearity axioms constrain this map; no associativity or identity is required.',{pa:['F','V'],sig:'B: V × V → V',dom:['vspace@F,V','vspace@F,V'],cod:['vspace@F,V'],lw:['algleftdist','algrightdist','algleftscalar','algrightscalar'],fm:'B(x,y)=x·y; B(x+y,z)=B(x,z)+B(y,z); B(x,y+z)=B(x,y)+B(x,z); B(ax,y)=aB(x,y); B(x,ay)=aB(x,y)'});
+D('falgebra','S','Algebra over F','An F-vector space V equipped with one F-bilinear internal product B: V×V→V. Neither associativity, commutativity nor a multiplicative identity is assumed.',{pa:['F','V'],ty:['field','abgrp'],p:'F-algebra V',w:6});
+
+
+/* ---------- connected algebra refinements (every product is the existing B) ---------- */
+D('aassoc','A','Algebra associativity','The existing bilinear product is associative.',{pa:['F','V'],fm:'∀x,y,z∈V: B(B(x,y),z)=B(x,B(y,z))'});
+D('acomm','A','Algebra commutativity','The existing bilinear product is commutative.',{pa:['F','V'],fm:'∀x,y∈V: B(x,y)=B(y,x)'});
+D('aunit','A','Algebra multiplicative unit','The existing bilinear product possesses a two-sided identity element.',{pa:['F','V'],fm:'∃e∈V ∀x∈V: B(e,x)=x=B(x,e)'});
+D('aalt','A','Alternating product','Every element brackets with itself to zero, independent of characteristic.',{pa:['F','V'],fm:'∀x∈V: B(x,x)=0'});
+D('ajacobi','A','Jacobi identity','Nested brackets satisfy the Jacobi identity. Together with alternation this defines a Lie algebra, including characteristic 2.',{pa:['F','V'],fm:'∀x,y,z∈V: B(x,B(y,z))+B(y,B(z,x))+B(z,B(x,y))=0'});
+D('ajordan','A','Jordan identity','A commutative, generally nonassociative product satisfies the Jordan identity.',{pa:['F','V'],fm:'∀x,y∈V: B(B(B(x,x),y),x)=B(B(x,x),B(y,x))'});
+D('alalt','A','Left alternativity','Repeated left multiplication associates.',{pa:['F','V'],fm:'∀x,y∈V: B(B(x,x),y)=B(x,B(x,y))'});
+D('aralt','A','Right alternativity','Repeated right multiplication associates.',{pa:['F','V'],fm:'∀x,y∈V: B(B(y,x),x)=B(y,B(x,x))'});
+D('aflex','A','Flexibility','Multiplication associates whenever outer factors coincide.',{pa:['F','V'],fm:'∀x,y∈V: B(B(x,y),x)=B(x,B(y,x))'});
+D('aprelie','A','Pre-Lie (left-symmetric) identity','The associator is symmetric in its first two arguments.',{pa:['F','V'],fm:'∀x,y,z: B(B(x,y),z)-B(x,B(y,z))=B(B(y,x),z)-B(y,B(x,z))'});
+D('aleib','A','Left Leibniz identity','Left multiplication acts as a derivation of the product.',{pa:['F','V'],fm:'∀x,y,z: B(x,B(y,z))=B(B(x,y),z)+B(y,B(x,z))'});
+D('arcomm','A','Right-commutativity','Right multiplications commute.',{pa:['F','V'],fm:'∀x,y,z: B(B(x,y),z)=B(B(x,z),y)'});
+D('aanti','A','Anticommutativity','The product changes sign on swapping its arguments. Unlike alternation alone, anticommutativity does not ensure B(x,x)=0 in characteristic 2.',{pa:['F','V'],fm:'∀x,y∈V: B(x,y)=-B(y,x)'});
+D('assocalg','S','Associative algebra','An F-algebra with associative bilinear multiplication; a unit is not assumed.',{pa:['F','V'],ty:['field','abgrp'],p:'associative F-algebra',w:5});
+D('commalg','S','Commutative algebra','An F-algebra with commutative multiplication; associativity is not assumed.',{pa:['F','V'],ty:['field','abgrp'],p:'commutative F-algebra',w:3});
+D('unitalalg','S','Unital algebra','An F-algebra with a two-sided multiplicative identity; associativity is not assumed.',{pa:['F','V'],ty:['field','abgrp'],p:'unital F-algebra',w:3});
+D('unitalassoc','S','Unital associative algebra','Associative F-algebra with a multiplicative unit.',{pa:['F','V'],ty:['field','abgrp'],p:'unital associative',w:5});
+D('commassoc','S','Commutative associative algebra','An associative algebra with a commutative product; no unit assumed.',{pa:['F','V'],ty:['field','abgrp'],p:'commutative associative',w:4});
+D('communitalassoc','S','Commutative unital associative algebra','Both commutative and unital, with an associative product.',{pa:['F','V'],ty:['field','abgrp'],p:'commutative unital',w:5});
+D('liealg','S','Lie algebra','An F-algebra whose existing bilinear bracket is alternating and satisfies Jacobi; characteristic-independent definition.',{pa:['F','V'],ty:['field','abgrp'],p:'Lie algebra over F',w:6});
+D('jordanalg','S','Jordan algebra','A commutative F-algebra satisfying the Jordan identity; valid in any characteristic under this definition.',{pa:['F','V'],ty:['field','abgrp'],p:'Jordan algebra',w:5});
+D('alternativealg','S','Alternative algebra','An F-algebra obeying both left and right alternative identities.',{pa:['F','V'],ty:['field','abgrp'],p:'alternative algebra',w:4});
+D('flexiblealg','S','Flexible algebra','An F-algebra satisfying flexibility.',{pa:['F','V'],ty:['field','abgrp'],p:'flexible algebra',w:2});
+D('preliealg','S','Pre-Lie algebra','An F-algebra whose associator is symmetric in the first two variables.',{pa:['F','V'],ty:['field','abgrp'],p:'left-symmetric algebra',w:4});
+D('leibnizalg','S','Left Leibniz algebra','An F-algebra satisfying the left Leibniz identity. Lie algebras satisfy this identity.',{pa:['F','V'],ty:['field','abgrp'],p:'left Leibniz algebra',w:4});
+D('novikovalg','S','Novikov algebra','A pre-Lie algebra whose right multiplications commute.',{pa:['F','V'],ty:['field','abgrp'],p:'Novikov algebra',w:3});
+D('anticommalg','S','Anticommutative algebra','An F-algebra with anticommutative multiplication. Characteristic 2 needs care.',{pa:['F','V'],ty:['field','abgrp'],p:'anticommutative',w:2});
+/* The commutator is a NEW product, constructed from an associative product. */
+D('commutator','M','Commutator bracket','A new bilinear map on the same vector space, B_new(x,y)=xy−yx, derived from associative multiplication. It is not a refinement of the old product.',{pa:['F','V'],sig:'[ , ]: V × V → V',dom:['vspace@F,V','vspace@F,V'],cod:['vspace@F,V'],fm:'[x,y]=xy−yx (xy is the associative-algebra product)'});
+/* A derivation is an additional linear endomorphism of the associative algebra. */
+D('derivmap','M','Derivation map','A candidate F-linear endomorphism D of V.',{pa:['F','V'],sig:'D: V → V',dom:['vspace@F,V'],cod:['vspace@F,V'],lw:['dlinear','dleib'],fm:'D:V→V'});
+D('dlinear','A','Derivation linearity','The derivation is F-linear.',{pa:['F','V'],fm:'D(x+y)=D(x)+D(y); D(ax)=aD(x)'});
+D('dleib','A','Derivation product rule','The derivation respects the EXISTING associative product by the Leibniz rule.',{pa:['F','V'],fm:'D(B(x,y))=B(D(x),y)+B(x,D(y))'});
+D('diffalg','S','Differential associative algebra','An associative F-algebra equipped with a distinguished F-linear derivation D.',{pa:['F','V'],ty:['field','abgrp'],p:'associative algebra + D',w:4});
+/* Poisson structures use TWO different products on one carrier. */
+D('palt','A','Poisson bracket alternating','The NEW bracket, not the commutative multiplication, is alternating.',{pa:['F','V'],fm:'∀x∈V: {x,x}=0'});
+D('pjacobi','A','Poisson bracket Jacobi','The NEW bracket satisfies Jacobi.',{pa:['F','V'],fm:'{x,{y,z}}+{y,{z,x}}+{z,{x,y}}=0'});
+D('poissonbracket','M','Poisson bracket','An additional bilinear Lie bracket on the underlying vector space; separate from the commutative associative product.',{pa:['F','V'],sig:'{ , }: V × V → V',dom:['vspace@F,V','vspace@F,V'],cod:['vspace@F,V'],lw:['palt','pjacobi','poissonleib'],fm:'{x,y} is alternating, bilinear and satisfies Jacobi'});
+D('poissonleib','A','Poisson Leibniz compatibility','The bracket is a derivation in either argument of the EXISTING commutative associative product.',{pa:['F','V'],fm:'{x,B(y,z)}=B({x,y},z)+B(y,{x,z})'});
+D('poissonalg','S','Poisson algebra','One commutative associative multiplication plus a separate Lie bracket on the SAME F-vector space, related by the Leibniz identity.',{pa:['F','V'],ty:['field','abgrp'],p:'Poisson algebra',w:5});
+/* routes: [target,name,mode,inputs "id@symbols",extra]. refine: first input inherited, rest added */
+const R=[['magma','Equip set with binary operation','joint',['set@G','binop@G']],
+['semigroup','Require associativity','refine',['magma@G','assoc@G']],
+['monoid','Add an identity','refine',['semigroup@G','ident@G']],
+['group','Add inverses','refine',['monoid@G','inv@G']],
+['abgrp','Require commutativity','refine',['group@A','comm@A']],
+['subgroup','Definition','refine',['group@G','subtest@G,N']],
+['subgroup','Image of a homomorphism','kernel',['hom@K,G','homlaw@K,G'],{loc:['K'],df:['N'],d:'N = im f = f(K), a subgroup of the codomain G.'}],
+['normal','Definition','refine',['subgroup@G,N','normality@G,N']],
+['normal','Kernel of a homomorphism','kernel',['hom@G,H','homlaw@G,H'],{loc:['H'],df:['N'],d:'N = ker f = { g : f(g) = e }. Then G/N ≅ im f.'}],
+['cosets','Construction','joint',['normal@G,N','cform@G,N']],
+['quotient','Construction','joint',['cosets@G,N','cmul@G,N','wdef@G,N']],
+['ring','Unital associative ring','joint',['abgrp@R','rmul@R','rassoc@R','runit@R','ldist@R','rdist@R']],
+['cring','Commutative multiplication','refine',['ring@R','mcomm@R']],
+['field','Field axioms','refine',['cring@F','nontriv@F','minv@F']],
+['module','Unital left module','joint',['ring@R','abgrp@V','moduleaction@R,V','madd@R,V','radd@R,V','mcomp@R,V','munit@R,V']],
+['vspace','Same scalar ring becomes a field','refine',['module@F,V','field@F'],{same:[{parameter:'F',uses:[['module',0],['field',0]]}],d:'The F acting on V in the existing left module is exactly the field F. No new scalar action or independent ring is introduced.'}]
+
+,['falgebra','Add a bilinear product','joint',['vspace@F,V','bilinear@F,V','algleftdist@F,V','algrightdist@F,V','algleftscalar@F,V','algrightscalar@F,V']]
+,['assocalg','Require associativity','refine',['falgebra@F,V','aassoc@F,V']]
+,['commalg','Require commutativity','refine',['falgebra@F,V','acomm@F,V']]
+,['unitalalg','Add a two-sided identity','refine',['falgebra@F,V','aunit@F,V']]
+,['unitalassoc','Adjoin the unit axiom','refine',['assocalg@F,V','aunit@F,V']]
+,['unitalassoc','Require associativity','refine',['unitalalg@F,V','aassoc@F,V']]
+,['commassoc','Require commutativity','refine',['assocalg@F,V','acomm@F,V']]
+,['commassoc','Require associativity','refine',['commalg@F,V','aassoc@F,V']]
+,['communitalassoc','Require the unit','refine',['commassoc@F,V','aunit@F,V']]
+,['communitalassoc','Require commutativity','refine',['unitalassoc@F,V','acomm@F,V']]
+,['liealg','Alternation plus Jacobi','refine',['falgebra@F,V','aalt@F,V','ajacobi@F,V']]
+,['liealg','Commutator from associative algebra','joint',['assocalg@F,V','commutator@F,V'],{d:'Define a NEW bracket [x,y]=xy−yx. The resulting Lie algebra has the same carrier, but a different multiplication map.'}]
+,['jordanalg','Jordan identity','refine',['commalg@F,V','ajordan@F,V']]
+,['alternativealg','Left and right alternativity','refine',['falgebra@F,V','alalt@F,V','aralt@F,V']]
+,['alternativealg','Associative products are alternative','refine',['assocalg@F,V']]
+,['flexiblealg','Flexibility identity','refine',['falgebra@F,V','aflex@F,V']]
+,['flexiblealg','Alternative implies flexible','refine',['alternativealg@F,V']]
+,['preliealg','Left-symmetric identity','refine',['falgebra@F,V','aprelie@F,V']]
+,['preliealg','Associative implies pre-Lie','refine',['assocalg@F,V']]
+,['leibnizalg','Left Leibniz identity','refine',['falgebra@F,V','aleib@F,V']]
+,['leibnizalg','Every Lie algebra is left Leibniz','refine',['liealg@F,V']]
+,['novikovalg','Right multiplications commute','refine',['preliealg@F,V','arcomm@F,V']]
+,['anticommalg','Anticommutativity','refine',['falgebra@F,V','aanti@F,V']]
+,['anticommalg','Every alternating product anticommutes','refine',['liealg@F,V']]
+,['diffalg','Add a derivation','joint',['assocalg@F,V','derivmap@F,V','dlinear@F,V','dleib@F,V']]
+,['poissonalg','Add compatible Poisson bracket','joint',['commassoc@F,V','poissonbracket@F,V','palt@F,V','pjacobi@F,V','poissonleib@F,V'],{d:'The Poisson bracket is a SECOND multiplication on the same carrier, not the commutative product.'}]
+
+].map(([t,n,m,i,x={}])=>({t,n,m,x,in:i.map(q=>{const[a,b]=bd(q);return{id:a,b,p:b.join(',')}})}));
+const E=[];R.forEach((r,ri)=>r.in.forEach(x=>E.push({s:x.id,t:r.t,ri,b:x.b,p:x.p})));
+/* Predicate subjects are distinct from construction prerequisites.
+   Each uses entry is an operation appearing in that predicate; for laws
+   relating two operations, BOTH operations are recorded. The generic binop
+   represents the inherited additive operation when used with ring/module laws.
+   Witness/existence axioms also record their non-map structural subject. */
+const SUBJECTS={
+ assoc:['binop'],ident:['binop'],inv:['binop'],comm:['binop'],
+ subtest:['binop'],normality:['binop'],homlaw:['hom','binop'],
+ wdef:['cmul'],zero:['binop'],
+ rassoc:['rmul'],runit:['rmul'],ldist:['rmul','binop'],rdist:['rmul','binop'],
+ mcomm:['rmul'],nontriv:['rmul','binop'],minv:['rmul'],
+ madd:['moduleaction','binop'],radd:['moduleaction','binop'],
+ mcomp:['moduleaction','rmul'],munit:['moduleaction'],
+ algleftdist:['bilinear','binop'],algrightdist:['bilinear','binop'],
+ algleftscalar:['bilinear','moduleaction'],algrightscalar:['bilinear','moduleaction'],
+ aassoc:['bilinear'],acomm:['bilinear'],aunit:['bilinear'],aalt:['bilinear'],
+ ajacobi:['bilinear'],ajordan:['bilinear'],alalt:['bilinear'],
+ aralt:['bilinear'],aflex:['bilinear'],aprelie:['bilinear'],
+ aleib:['bilinear'],arcomm:['bilinear'],aanti:['bilinear'],
+ dlinear:['derivmap','moduleaction','binop'],
+ dleib:['derivmap','bilinear'],
+ palt:['poissonbracket'],pjacobi:['poissonbracket'],
+ poissonleib:['poissonbracket','bilinear']
+};
+/* A MAP template may have several distinct occurrences in a construction.
+   Never merge ring addition, module addition, and algebra multiplication merely
+   because they have compatible underlying set-level types. */
+const OPERATION_INSTANCES={
+ ring_add:{template:'binop',owner:'ring',carrier:'R',symbol:'+',signature:'R × R → R',description:'Addition of scalars; inherited from the abelian group on R.'},
+ ring_multiply:{template:'rmul',owner:'ring',carrier:'R',symbol:'·',signature:'R × R → R',description:'Multiplication of scalars; constrained by distributivity with ring addition.'},
+ module_add:{template:'binop',owner:'module',carrier:'V',symbol:'+',signature:'V × V → V',description:'Addition of module elements; inherited from the abelian group on V.'},
+ module_scalar:{template:'moduleaction',owner:'module',carrier:'R,V',symbol:'·',signature:'R × V → V',description:'External scalar action, not an internal binary operation on V.'},
+ algebra_product:{template:'bilinear',owner:'falgebra',carrier:'V',symbol:'B',signature:'V × V → V',description:'New internal bilinear product, distinct from vector addition.'}
+};
+const OCCURRENCE_SUBJECTS={
+ rassoc:['ring_multiply'],runit:['ring_multiply'],mcomm:['ring_multiply'],
+ ldist:['ring_multiply','ring_add'],rdist:['ring_multiply','ring_add'],
+ madd:['module_scalar','module_add'],radd:['module_scalar','ring_add','module_add'],
+ mcomp:['module_scalar','ring_multiply'],munit:['module_scalar'],
+ algleftdist:['algebra_product','module_add'],algrightdist:['algebra_product','module_add'],
+ algleftscalar:['algebra_product','module_scalar'],algrightscalar:['algebra_product','module_scalar'],
+ nontriv:['ring_add','ring_multiply'],minv:['ring_multiply']
+};
+['aassoc','acomm','aunit','aalt','ajacobi','ajordan','alalt','aralt','aflex','aprelie','aleib','arcomm','aanti'].forEach(id=>OCCURRENCE_SUBJECTS[id]=['algebra_product']);
+/* Route-local operation identity: refinement preserves the product; a
+   commutator route introduces a DIFFERENT bilinear product. These facts are
+   semantic metadata, not inferred from the appearance of gold edges. */
+const ROUTE_OPERATION_SEMANTICS={
+ 'liealg|Commutator from associative algebra':{
+   operation:'commutator',kind:'new',source:'algebra_product',
+   explanation:'NEW bracket [x,y]=xy−yx; the original associative product xy remains a separate operation.'},
+ 'liealg|Alternation plus Jacobi':{
+   operation:'algebra_product',kind:'same',
+   explanation:'SAME inherited bilinear product, now required to be alternating and satisfy Jacobi.'},
+ 'anticommalg|Every alternating product anticommutes':{
+   operation:'inherited',kind:'same',
+   explanation:'SAME bracket as the Lie algebra; anticommutativity follows from alternation.'},
+ 'anticommalg|Anticommutativity':{
+   operation:'algebra_product',kind:'same',
+   explanation:'SAME algebra multiplication, with anticommutativity added as a requirement.'},
+ 'poissonalg|Add compatible Poisson bracket':{
+   operation:'poissonbracket',kind:'new',source:'algebra_product',
+   explanation:'NEW Poisson bracket in addition to the existing commutative associative product.'}
+};
+/* Proven entailments are explicitly scoped to the SAME operation. This is
+   not a characteristic-dependent cancellation rule. */
+const PROPERTY_ENTAILMENTS={
+ aalt:[{property:'aanti',why:'B(x+y,x+y)=0 and bilinearity imply B(x,y)+B(y,x)=0, in every characteristic.'}],
+ aassoc:[{property:'aflex',why:'Associativity implies (xy)x=x(yx).'},
+         {property:'alalt',why:'Associativity implies left alternativity.'},
+         {property:'aralt',why:'Associativity implies right alternativity.'},
+         {property:'aprelie',why:'Associativity makes both sides of the pre-Lie identity zero.'}],
+};
+const selectedRouteFor=id=>{const choice=ms[mi]||{};
+ const ri=choice[id];return ri===undefined?R.find(r=>r.t===id):R[ri]};
+function directRouteChanges(r){
+ if(!r)return {base:[],added:[],axioms:[],maps:[],entailed:[],semantic:null};
+ const base=r.m==='refine'?[r.in[0]]:[];
+ const added=r.m==='refine'?r.in.slice(1):r.in;
+ const axioms=added.filter(x=>N[x.id]?.k==='A');
+ const maps=added.filter(x=>N[x.id]?.k==='M');
+ const entailed=[];
+ for(const x of axioms)for(const fact of PROPERTY_ENTAILMENTS[x.id]||[])entailed.push(fact);
+ if(r.t==='liealg'&&r.n==='Commutator from associative algebra'){
+   entailed.push({property:'aalt',why:'[x,x]=xx−xx=0 for the NEW bracket.'});
+   entailed.push({property:'ajacobi',why:'The commutator of an associative multiplication satisfies Jacobi.'});
+   entailed.push({property:'aanti',why:'[x,y]=xy−yx=−[y,x] for the NEW bracket.'});
+ }
+ if(r.t==='anticommalg'&&r.in.some(x=>x.id==='liealg'))
+   entailed.push({property:'aanti',why:'Inherited alternation implies anticommutativity on the SAME Lie bracket.'});
+ if(r.t==='flexiblealg'&&r.in.some(x=>x.id==='alternativealg'))
+   entailed.push({property:'aflex',why:'The two alternative identities imply flexibility on the SAME product.'});
+ const sem=ROUTE_OPERATION_SEMANTICS[r.t+'|'+r.n]||null;
+ return {base,added,axioms,maps,entailed,semantic:sem};
+}
+function inheritedAxioms(r,seen=new Set()){
+ if(!r)return [];
+ const out=new Set();
+ for(const x of (r.m==='refine'?r.in.slice(0,1):r.in).filter(x=>N[x.id]?.k==='S')){
+   if(seen.has(x.id))continue;
+   seen.add(x.id);
+   const parent=selectedRouteFor(x.id);
+   if(!parent)continue;
+   for(const a of parent.in.filter(q=>N[q.id]?.k==='A'))out.add(a.id);
+   for(const a of inheritedAxioms(parent,seen))out.add(a);
+ }
+ return [...out];
+}
+/* Generic contextual refinement: if two prerequisites bind the SAME parameter
+   but demand different structural strengths, trace the refinement chain and
+   report every intermediate structure and newly imposed predicate. Never
+   identify distinct parameters merely because their carrier types agree. */
+function refinementPath(weaker,stronger){
+ if(weaker===stronger)return [weaker];
+ const queue=[[weaker]],seen=new Set([weaker]);
+ while(queue.length){const path=queue.shift(),last=path[path.length-1];
+  for(const r of R){if(r.m!=='refine'||r.in[0]?.id!==last||N[r.t]?.k!=='S'||seen.has(r.t))continue;
+   /* A unary-carrier refinement must keep its underlying instance. */
+   if(N[last].pa.length!==1||N[r.t].pa.length!==1||r.in[0].b[0]!==N[r.t].pa[0])continue;
+   const next=[...path,r.t];if(r.t===stronger)return next;
+   seen.add(r.t);queue.push(next);
+  }
+ }
+ return null;
+}
+function contextualRefinements(r){
+ if(!r)return [];
+ const structures=r.in.filter(x=>N[x.id]?.k==='S'),found=[];
+ for(let i=0;i<structures.length;i++)for(let j=i+1;j<structures.length;j++){
+  const left=structures[i],right=structures[j];
+  for(let a=0;a<left.b.length;a++)for(let b=0;b<right.b.length;b++){
+   if(left.b[a]!==right.b[b])continue;
+   const lt=N[left.id].ty[a],rt=N[right.id].ty[b];
+   if(!lt||!rt||lt===rt)continue;
+   const forward=refinementPath(lt,rt),reverse=refinementPath(rt,lt);
+   const path=forward||reverse;if(!path)continue;
+   const steps=path.slice(1).map((id,k)=>{
+    const previous=path[k],route=R.find(q=>q.t===id&&q.m==='refine'&&q.in[0]?.id===previous);
+    return {id,from:previous,axioms:(route?.in||[]).slice(1).filter(x=>N[x.id]?.k==='A').map(x=>x.id)};
+   });
+   found.push({parameter:left.b[a],weaker:path[0],stronger:path[path.length-1],
+     inputs:[left.id,right.id],path,steps});
+  }
+ }
+ return [...new Map(found.map(x=>[x.parameter+'|'+x.weaker+'|'+x.stronger,x])).values()];
+}
+function constructionDelta(id){const r=selectedRouteFor(id);return {r,...directRouteChanges(r),inheritedAxioms:inheritedAxioms(r),refinements:contextualRefinements(r)};}
+const operationInstancesFor=id=>Object.entries(OPERATION_INSTANCES).filter(([key,o])=>o.owner===id||(id==='vspace'&&['ring_add','ring_multiply','module_add','module_scalar'].includes(key))||(id==='field'&&['ring_add','ring_multiply'].includes(key))||(id==='falgebra'&&key==='module_scalar'));
+const SUBJECT_CONTEXT={
+ subtest:'A subgroup criterion on the ambient group operation and candidate subset.',
+ normality:'Conjugation by the ambient group operation preserves the subgroup.',
+ wdef:'The induced coset product must not depend on representative choice.',
+ zero:'The inherited additive group operation supplies the zero element.',
+ nontriv:'The additive identity and the multiplicative identity are distinct.',
+ algleftscalar:'Relates algebra multiplication to the inherited scalar action.',
+ algrightscalar:'Relates algebra multiplication to the inherited scalar action.',
+ mcomp:'Relates the scalar action to multiplication of the scalar ring.',
+ radd:'Uses addition both in the ring and in the module.',
+ madd:'Uses the inherited module addition.',
+ ldist:'Relates ring multiplication to inherited ring addition.',
+ rdist:'Relates ring multiplication to inherited ring addition.',
+ poissonleib:'Relates the independent Poisson bracket to the existing algebra product.'
+};
+L.filter(n=>n.k==='A').forEach(a=>{a.uses=SUBJECTS[a.id]||[];a.subjectNote=SUBJECT_CONTEXT[a.id]||''});
+const SUBJECT_EDGES=L.filter(n=>n.k==='A').flatMap(a=>a.uses.map(m=>({a:a.id,m})));
+/* Keep the full construction requirements in R/E for proofs, parameter binding,
+   validation and method selection. In the VIEW, predicates attach only to their
+   subject operations; their gold arrow into the structure would be redundant.
+   Do not confuse removal of a drawn arrow with removal of a proof obligation. */
+const DISPLAY_EDGES=E.filter(e=>N[e.s].k!=='A'||!N[e.s].uses.length);
+
+
+/* ---------- validation (runs before display) ---------- */
+const V=[],ck=(n,f)=>{let o;try{o=!!f()}catch(e){o=false}V.push([n,o])};
+const reach=(a,b,skip)=>{const q=[a],s=new Set;while(q.length){const u=q.pop();E.forEach(e=>{if(e.s==u&&N[e.t].k=='S'&&!(skip&&u==a&&e.t==b)&&!s.has(e.t)){s.add(e.t);q.push(e.t)}})}return s.has(b)};
+const inn=(b,pa)=>b.every(x=>pa.includes(x)),Ms=()=>L.filter(n=>n.k=='M');
+ck('references resolve',()=>E.every(e=>N[e.s]&&N[e.t])&&L.every(n=>[...(n.dom||[]),...(n.cod||[]),...(n.der?[n.der]:[]),...(n.lw||[])].every(x=>N[x])));
+ck('axiom subjects resolve to actual map nodes',()=>L.filter(n=>n.k==='A').every(a=>a.uses.length>0&&a.uses.every(m=>N[m]?.k==='M')));
+ck('constrained axioms do not duplicate gold construction edges',()=>DISPLAY_EDGES.every(e=>N[e.s].k!=='A'||!N[e.s].uses.length));
+ck('hidden axiom arrows retain their original construction requirements',()=>R.every((r,ri)=>r.in.every(x=>E.some(e=>e.ri===ri&&e.s===x.id&&e.t===r.t))));
+ck('map constrained-by metadata agrees with axiom subjects',()=>Ms().every(m=>(m.lw||[]).every(a=>N[a]?.k==='A'&&N[a].uses.includes(m.id))));
+ck('maps typed: domain and codomain are structures',()=>Ms().every(m=>m.dom&&m.cod&&[...m.dom,...m.cod].every(x=>N[x].k=='S')));
+ck('construction graph acyclic',()=>{const st={},f=u=>{if(st[u]==1)throw 0;if(st[u]==2)return;st[u]=1;E.filter(e=>e.s==u).forEach(e=>f(e.t));st[u]=2};L.forEach(n=>f(n.id));return 1});
+ck('no solid STRUCTURE→MAP or MAP→MAP',()=>E.every(e=>N[e.t].k=='S'));
+ck('joint routes have ≥2 inputs',()=>R.filter(r=>r.m=='joint').every(r=>r.in.length>=2));
+ck('binding arity matches every input and signature',()=>E.every(e=>e.b.length==N[e.s].pa.length)&&Ms().every(m=>m.db.every((b,i)=>b.length==N[m.dom[i]].pa.length)&&m.cb.every((b,i)=>b.length==N[m.cod[i]].pa.length)));
+ck('every bound symbol is declared (no silent substitution)',()=>R.every(r=>r.in.every(x=>inn(x.b,[...N[r.t].pa,...(r.x.loc||[])])))&&Ms().every(m=>[...m.db,...m.cb].every(b=>inn(b,m.pa))));
+ck('contextual shared-instance constraints are exact',()=>R.every(r=>(r.x.same||[]).every(g=>r.t==='vspace'&&r.in.every(x=>x.b.every(v=>r.in.some(y=>y.b.includes(v))))&&g.uses.length>=2&&g.uses.every(([id,j])=>{const x=r.in.find(x=>x.id===id);return x&&x.b[j]===g.parameter})&&N[r.t].pa.includes(g.parameter))));
+ck('vector-space scalar is the identical module scalar ring',()=>{const r=R.find(r=>r.t==='vspace');return !!r&&r.in.find(x=>x.id==='module')?.b[0]===r.in.find(x=>x.id==='field')?.b[0]&&r.x.same?.[0]?.parameter===r.in.find(x=>x.id==='field')?.b[0]});
+ck('every target parameter is determined by its route',()=>R.every(r=>N[r.t].pa.every(a=>r.in.some(x=>x.b.includes(a))||(r.x.df||[]).includes(a))));
+ck('parameter types coherent',()=>R.every(r=>r.in.every(x=>x.b.every((a,j)=>{const q=N[x.id].ty[j],i=N[r.t].pa.indexOf(a),t=i<0?null:N[r.t].ty[i];return!q||!t||q==t||reach(q,t)}))));
+ck('every typed parameter is supplied by a matching input',()=>R.every(r=>N[r.t].pa.every((a,i)=>{const T=N[r.t].ty[i];return!T||T==r.t||r.in.some(x=>x.b.some((c,j)=>{const q=N[x.id].ty[j];return c==a&&q&&(q==T||reach(T,q))}))})));
+ck('no redundant structure prerequisites within one route',()=>R.every(r=>r.in.every(x=>N[x.id].k!='S'||!r.in.some(y=>y!==x&&N[y.id].k=='S'&&x.p===y.p&&reach(x.id,y.id)))));
+ck('derived map lands in the structure it derives from',()=>L.filter(n=>n.der).every(m=>m.cod.includes(m.der)));
+ck('no circular signatures (a map never mentions what it helps define)',()=>Ms().every(m=>E.filter(e=>e.s==m.id).every(e=>[...m.dom,...m.cod].every(x=>x!=e.t&&!reach(e.t,x)))));
+ck('derived maps are results, never inputs',()=>L.filter(n=>n.der).every(m=>!E.some(e=>e.s==m.id)));
+ck('every structure has a route or is primitive',()=>L.filter(n=>n.k=='S').every(n=>n.id=='set'||R.some(r=>r.t==n.id)));
+ck('foundations terminate at Set',()=>L.filter(n=>n.k=='S'&&n.id!='set').every(n=>reach('set',n.id)));
+ck('operation occurrences have valid templates and owners',()=>Object.values(OPERATION_INSTANCES).every(o=>N[o.template]?.k==='M'&&N[o.owner]?.k==='S'));
+ck('axiom operation occurrences resolve',()=>Object.values(OCCURRENCE_SUBJECTS).every(a=>a.every(id=>OPERATION_INSTANCES[id])));
+ck('all detected refinements have matching instance bindings',()=>R.every(r=>contextualRefinements(r).every(q=>q.path[0]===q.weaker&&q.path.at(-1)===q.stronger&&q.steps.every(s=>N[s.id]?.k==='S'))));
+ck('module-to-vector-space shows ring, commutative ring, field',()=>{const r=R.find(r=>r.t==='vspace');const q=contextualRefinements(r).find(x=>x.parameter==='F');return !!q&&q.path.join('>')==='ring>cring>field'&&q.steps.some(s=>s.axioms.includes('mcomm'))&&q.steps.some(s=>s.axioms.includes('nontriv')&&s.axioms.includes('minv'));});
+const vOK=V.filter(v=>v[1]).length;
+/* ---------- ranks and columns ---------- */
+const rk={},Rk=id=>rk[id]??(rk[id]=R.filter(r=>r.t==id).reduce((m,r)=>Math.max(m,...r.in.filter(x=>N[x.id].k=='S').map(x=>Rk(x.id)+1)),0));
+const col=id=>{const n=N[id];if(n.k=='S')return Rk(id);const o=E.filter(e=>e.s==id).map(e=>Rk(e.t)-1);if(o.length)return Math.min(...o);if(n.der)return Rk(n.der)+1;return Math.max(...n.dom.map(Rk))+1};
+const deg=id=>E.filter(e=>e.s==id||e.t==id).length;
+/* ---------- state ---------- */
+const cv=document.getElementById('cv'),sv=document.getElementById('sv'),wd=document.getElementById('wd'),ins=document.getElementById('ins');
+let focused=true,ms=[],mi=0,ar=new Set,al=new Set,act=new Set,sel,depth=10,vs=new Set,near=new Set,P={},W={},manual={},cam={x:0,y:0,k:1},userZ=false,hl=null,hist=[],hi=-1,raf;
+const rm=matchMedia('(prefers-reduced-motion:reduce)').matches,H=60,GAP=350,VG=150;
+const cx=document.createElement('canvas').getContext('2d');
+const width=n=>{cx.font='600 14px system-ui,sans-serif';const a=cx.measureText(n.name).width;cx.font='9px system-ui,sans-serif';const lb=lab(n),b=cx.measureText(lb).width+lb.length*.8;return Math.round(Math.min(390,Math.max(154,Math.max(a,b)+46)))};
+const lab=n=>K[n.k]+(n.sig||n.p?' · '+(n.sig||n.p):'');
+/* ---------- visible neighbourhood + layout ---------- */
+function vis(d,roots){const s=new Set(roots);let f=[...roots];
+for(let i=0;i<d;i++){const nx=[];f.forEach(u=>E.forEach(e=>{if(e.t==u&&!s.has(e.s)){s.add(e.s);nx.push(e.s)}}));f=nx}
+[...s].forEach(u=>{if(R.filter(r=>r.t==u).length>1)E.forEach(e=>{if(e.t==u)s.add(e.s)})});
+E.forEach(e=>{if(e.s==sel)s.add(e.t)});L.forEach(n=>{if(n.der==sel)s.add(n.id)});
+[...s].forEach(u=>{const n=N[u];if(n.k=='M')[...n.dom,...n.cod].forEach(x=>s.add(x))});
+if(N[sel].k==='A')N[sel].uses.forEach(x=>s.add(x));
+if(N[sel].k==='M')L.filter(n=>n.k==='A'&&n.uses.includes(sel)).forEach(n=>s.add(n.id));
+return s}
+function visAuto(){const m=N[sel],roots=m.k=='M'?[sel,...m.dom,...m.cod]:[sel];
+for(let d=depth;;d++){const s=vis(d,roots);if(d>=12||![...s].some(i=>N[i].k=='S'&&!E.some(e=>(e.s==i&&s.has(e.t))||(e.t==i&&s.has(e.s)))))return s}}
+function layout(){
+vs=visAuto();near=new Set([sel]);E.forEach(e=>{if(e.s==sel)near.add(e.t);if(e.t==sel)near.add(e.s)});
+const ids=[...vs],adj={},cols={},Y={};ids.forEach(i=>{adj[i]=new Set;W[i]=width(N[i]);(cols[col(i)]??=[]).push(i)});
+const lk=(a,b)=>{if(vs.has(a)&&vs.has(b)&&a!=b){adj[a].add(b);adj[b].add(a)}};
+DISPLAY_EDGES.forEach(e=>lk(e.s,e.t));ids.forEach(i=>{const n=N[i];if(n.k=='M')[...n.dom,...n.cod].forEach(x=>lk(i,x))});
+SUBJECT_EDGES.forEach(e=>lk(e.a,e.m));
+const cs=Object.keys(cols).map(Number).sort((a,b)=>a-b);cs.forEach(c=>cols[c].forEach((i,j)=>Y[i]=j*VG));
+for(let it=0;it<8;it++)(it%2?[...cs].reverse():cs).forEach(c=>{const a=cols[c];
+const b=i=>{const y=[...adj[i]].filter(j=>col(j)!=c).map(j=>Y[j]);return y.length?y.reduce((p,q)=>p+q,0)/y.length:Y[i]};
+const bs={};a.forEach(i=>bs[i]=b(i));a.sort((p,q)=>bs[p]-bs[q]);
+let prev=-1e9;const ys=a.map(i=>prev=Math.max(bs[i],prev+VG));
+const sh=a.reduce((s,i,j)=>s+bs[i]-ys[j],0)/a.length;a.forEach((i,j)=>Y[i]=ys[j]+sh)});
+P={};ids.forEach(i=>P[i]=manual[i]?{...manual[i]}:{x:col(i)*GAP,y:Y[i]});meth()}
+/* ---------- construction methods: one route chosen at every branching ancestor ---------- */
+function meth(){ms=[];
+const rec=(q,seen,ch)=>{while(q.length){const u=q.shift();if(seen.has(u)||!vs.has(u))continue;seen.add(u);
+const rs=R.map((r,i)=>i).filter(i=>R[i].t==u);if(!rs.length)continue;
+if(rs.length==1){ch={...ch,[u]:rs[0]};R[rs[0]].in.forEach(x=>q.push(x.id));continue}
+rs.forEach(i=>rec([...q,...R[i].in.map(x=>x.id)],new Set(seen),{...ch,[u]:i}));return}
+ms.push(ch)};
+rec([sel],new Set,{});mi=Math.min(mi,ms.length-1);setM()}
+function setM(){const ch=ms[mi]||{};ar=new Set(Object.values(ch));al=new Set(ms.flatMap(c=>Object.values(c)));
+act=new Set([sel]);Object.values(ch).forEach(i=>{act.add(R[i].t);R[i].in.forEach(x=>act.add(x.id))});
+[...act].forEach(u=>{const n=N[u];if(n.k=='M')[...n.dom,...n.cod].forEach(x=>act.add(x))});
+const br=Object.entries(ch).filter(([u])=>R.filter(r=>r.t==u).length>1).map(([u,i])=>N[u].name+' · '+R[i].n);
+$('methodCount').textContent=`${mi+1} / ${ms.length||1}`;
+$('mt').textContent=br.length ? br[0]+(br.length>1?` (+${br.length-1} branches)`:'') : 'Single construction route';
+$('mt').title=br.join(' | ')||'Single construction route';
+const menu=$('methodMenu');
+menu.innerHTML='<header><span>Choose a complete construction route</span><span>'+ms.length+' methods</span></header>'+ms.map((method,j)=>{
+ const lines=Object.entries(method).filter(([u])=>R.filter(r=>r.t==u).length>1).map(([u,i])=>`${N[u].name}: ${R[i].n}`);
+ const name=lines[0]||'Definition';
+ return `<button class="method-option ${j===mi?'active':''}" data-method="${j}" aria-pressed="${j===mi}"><strong>Method ${j+1} of ${ms.length} · ${name}</strong><small>${lines.join(' / ')||'No alternative branches'}</small></button>`;
+}).join('');
+$('mp').disabled=$('mn').disabled=ms.length<2;if(sel&&ins.innerHTML)panel()}
+/* A focused view is a projection of one chosen route, not a change to the
+   mathematical dependency graph. All alternative routes remain available. */
+function visibleNodes(){
+ if(!focused)return vs;
+ const chosen=ms[mi]||{},out=new Set([sel]);
+ Object.values(chosen).forEach(i=>{out.add(R[i].t);R[i].in.forEach(x=>out.add(x.id))});
+ // Preserve the immediate construction frontier: every directly buildable
+ // structure remains visible and clickable to the RIGHT of the selection.
+ // This does not pull in the frontier's ancestors or descendants.
+ E.forEach(e=>{if(e.s===sel)out.add(e.t)});
+ // Derived maps are results of a structure, not prerequisites.
+ L.forEach(n=>{if(n.der===sel)out.add(n.id)});
+ // A map brings its signature types, and its participating axioms only when
+ // those axioms are required by this selected construction.
+ [...out].forEach(id=>{const n=N[id];if(n?.k==='M'){[...n.dom,...n.cod].forEach(x=>out.add(x));}});
+ if(N[sel]?.k==='S')constructionDelta(sel).entailed.forEach(q=>out.add(q.property));
+ if(N[sel]?.k==='A')N[sel].uses.forEach(id=>out.add(id));
+ if(N[sel]?.k==='M')L.filter(a=>a.k==='A'&&a.uses.includes(sel)).forEach(a=>out.add(a.id));
+ return new Set([...out].filter(id=>vs.has(id)));
+}
+/* ---------- geometry ---------- */
+const side=(i,d)=>({x:P[i].x+d*W[i]/2,y:P[i].y});
+function sp(e){const A=P[e.s],B=P[e.t],d=A.x<=B.x?1:-1;let a=side(e.s,d),b=side(e.t,-d);
+if((b.x-a.x)*d<40){const v=A.y<=B.y?1:-1,c=Math.max(50,Math.abs(B.y-A.y)*.5);a={x:A.x,y:A.y+v*H/2};b={x:B.x,y:B.y-v*H/2};return[a,{x:a.x,y:a.y+v*c},{x:b.x,y:b.y-v*c},b]}
+const c=Math.max(60,Math.abs(b.x-a.x)*.5);return[a,{x:a.x+d*c,y:a.y},{x:b.x-d*c,y:b.y},b]}
+const edge=(i,tx,ty)=>{const dx=tx-P[i].x,dy=ty-P[i].y,s=Math.min(dx?W[i]/2/Math.abs(dx):1e9,dy?H/2/Math.abs(dy):1e9);return{x:P[i].x+dx*s,y:P[i].y+dy*s}};
+const arrow=(x,y,a,c,o)=>`<polygon points="-6,-6 7,0 -6,6" transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${(a*180/Math.PI).toFixed(1)})" fill="${c}" opacity="${o}"/>`;
+function curve(a,b,c,o,lb){const A=P[a],B=P[b],mx=(A.x+B.x)/2,my=(A.y+B.y)/2,dx=B.x-A.x,dy=B.y-A.y,l=Math.hypot(dx,dy)||1,bend=Math.max(58,l*.16);
+const q={x:mx-dy/l*bend,y:my+dx/l*bend},p0=edge(a,q.x,q.y),p1=edge(b,q.x,q.y),m={x:(p0.x+2*q.x+p1.x)/4,y:(p0.y+2*q.y+p1.y)/4};
+return`<path d="M${p0.x} ${p0.y}Q${q.x} ${q.y} ${p1.x} ${p1.y}" fill="none" stroke="${c}" stroke-width="1.9" stroke-dasharray="2 5" stroke-linecap="round" opacity="${o}"/>`+arrow(m.x,m.y,Math.atan2(p1.y-p0.y,p1.x-p0.x),c,o)+`<text x="${m.x}" y="${m.y-9}" text-anchor="middle" font-size="9" fill="${c}" opacity="${o}">${lb}</text>`}
+/* Multiple domain factors share a single incoming domain junction.
+   This is visual bundling only: the underlying ordered domain factors,
+   bindings, construction edges, and codomain remain unchanged. */
+function domainBundle(m,o){
+ const sources=[...new Set(m.dom)].filter(id=>vs.has(id)&&P[id]);
+ if(sources.length<2)return sources.map(id=>curve(id,m.id,CY,o,'dom '+m.db[m.dom.indexOf(id)].join(','))).join('');
+ const target=P[m.id],avgX=sources.reduce((a,id)=>a+P[id].x,0)/sources.length;
+ const avgY=sources.reduce((a,id)=>a+P[id].y,0)/sources.length;
+ const dir=avgX<=target.x?-1:1;
+ // The merge stays near the map but off its centreline, so the shared trunk bends.
+ const j={x:target.x+dir*(W[m.id]/2+115),y:target.y+(avgY-target.y)*.27};
+ let out='';
+ sources.forEach(id=>{
+  const a=edge(id,j.x,j.y),dx=j.x-a.x,dy=j.y-a.y;
+  const bend=Math.max(35,Math.abs(dx)*.40);
+  const p={x:a.x-dir*bend,y:a.y},q={x:j.x+dir*Math.max(24,Math.abs(dx)*.28),y:j.y};
+  const label=m.db.filter((b,i)=>m.dom[i]===id).map(b=>b.join(',')).join(' × ');
+  const t=.44,z=1-t;
+  const px=z*z*z*a.x+3*z*z*t*p.x+3*z*t*t*q.x+t*t*t*j.x;
+  const py=z*z*z*a.y+3*z*z*t*p.y+3*z*t*t*q.y+t*t*t*j.y;
+  out+=`<path d="M${a.x} ${a.y}C${p.x} ${p.y} ${q.x} ${q.y} ${j.x} ${j.y}" fill="none" stroke="${CY}" stroke-width="1.9" stroke-dasharray="2 5" stroke-linecap="round" opacity="${o}"/>`;
+  out+=`<text x="${px}" y="${py-10}" text-anchor="middle" font-size="9" fill="${CY}" opacity="${o}">dom ${label}</text>`;
+ });
+ const b=edge(m.id,j.x,j.y),dx=b.x-j.x,dy=b.y-j.y;
+ const c1={x:j.x-dir*35,y:j.y},c2={x:b.x+dir*35,y:b.y};
+ out+=`<path d="M${j.x} ${j.y}C${c1.x} ${c1.y} ${c2.x} ${c2.y} ${b.x} ${b.y}" fill="none" stroke="${CY}" stroke-width="2.2" stroke-dasharray="2 5" stroke-linecap="round" opacity="${o}"/>`;
+ const t=.64,z=1-t;
+ const ax=z*z*z*j.x+3*z*z*t*c1.x+3*z*t*t*c2.x+t*t*t*b.x;
+ const ay=z*z*z*j.y+3*z*z*t*c1.y+3*z*t*t*c2.y+t*t*t*b.y;
+ const tx=3*z*z*(c1.x-j.x)+6*z*t*(c2.x-c1.x)+3*t*t*(b.x-c2.x);
+ const ty=3*z*z*(c1.y-j.y)+6*z*t*(c2.y-c1.y)+3*t*t*(b.y-c2.y);
+ out+=arrow(ax,ay,Math.atan2(ty,tx),CY,o);
+ out+=`<circle cx="${j.x}" cy="${j.y}" r="5" fill="#0e1b37" stroke="${CY}" stroke-width="2" opacity="${o}"/>`;
+ return out;
+}
+function shape(n){const w=W[n.id],x=-w/2,y=-H/2;if(n.k=='S')return`<rect class="sh" x="${x}" y="${y}" width="${w}" height="${H}" rx="10"`;
+if(n.k=='M')return`<rect class="sh" x="${x}" y="${y}" width="${w}" height="${H}" rx="${H/2}"`;
+const c=12;return`<path class="sh" d="M${x+c} ${y}H${-x-c}L${-x} ${y+c}V${-y-c}L${-x-c} ${-y}H${x+c}L${x} ${-y-c}V${y+c}Z"`}
+/* ---------- render ---------- */
+function contextOverlay(){
+ // This is NOT an additional prerequisite arrow. It highlights identity of
+ // the scalar argument bound by both branches in the selected construction.
+ if(sel!=='vspace')return '';
+ const ids=['ring','module','cring','field','vspace'];
+ if(!ids.every(id=>P[id]&&vs.has(id)))return '';
+ let s='';
+ const links=[['ring','module'],['ring','cring'],['cring','field'],['module','vspace'],['field','vspace']];
+ links.forEach(([a,b])=>{const e=E.find(e=>e.s===a&&e.t===b);if(!e)return;
+ const [p0,p1,p2,p3]=sp(e);
+ s+=`<path d="M${p0.x} ${p0.y}C${p1.x} ${p1.y} ${p2.x} ${p2.y} ${p3.x} ${p3.y}" fill="none" stroke="${PURPLE}" stroke-width="4" opacity=".8" stroke-linecap="round" pointer-events="none"/>`;
+ });
+ ['ring','module','cring','field'].forEach(id=>{const q=P[id];
+ const label=id==='module'?'same F':id==='field'?'same F':id==='ring'?'scalar ring F':'same F';
+ const x=q.x, y=q.y-H/2-17;
+ s+=`<g pointer-events="none"><rect x="${x-55}" y="${y-11}" width="110" height="20" rx="7" fill="#281d40" stroke="${PURPLE}" stroke-width="1"/><text x="${x}" y="${y+3}" text-anchor="middle" font-size="11" font-weight="600" fill="#e9dcff">${label}</text></g>`;
+ });
+ return s;
+}
+function draw(){
+const shown=visibleNodes();const ve=DISPLAY_EDGES.filter(e=>shown.has(e.s)&&shown.has(e.t));let rg='',ed='',sg='',nd='';
+ve.forEach(e=>{if(N[e.t].k!='S')throw Error('invalid solid edge')});
+ve.forEach(e=>{const[a,b,c,d]=sp(e),inc=e.s==sel||e.t==sel||ar.has(e.ri),h=hl===e.ri,dm=!inc&&al.has(e.ri),col=h?'#fff':inc||dm?GOLD:'#aebbd6',o=inc||h?1:dm?.28:.5;
+ed+=`<path d="M${a.x} ${a.y}C${b.x} ${b.y} ${c.x} ${c.y} ${d.x} ${d.y}" fill="none" stroke="${col}" stroke-width="${inc||h?2.3:1.5}" opacity="${o}" pointer-events="none"/>`;
+// A wide, invisible hit target makes thin curved construction edges easy to select.
+// Duplicate source-target edges share a hit target; consecutive clicks cycle their routes.
+ed+=`<path class="route-hit" data-source="${e.s}" data-target="${e.t}" d="M${a.x} ${a.y}C${b.x} ${b.y} ${c.x} ${c.y} ${d.x} ${d.y}" fill="none" stroke="transparent" stroke-width="18" pointer-events="stroke" style="cursor:pointer"/>`;
+const mx=(a.x+3*b.x+3*c.x+d.x)/8,my=(a.y+3*b.y+3*c.y+d.y)/8,tx=.75*(b.x-a.x)+1.5*(c.x-b.x)+.75*(d.x-c.x),ty=.75*(b.y-a.y)+1.5*(c.y-b.y)+.75*(d.y-c.y);
+ed+=arrow(mx,my,Math.atan2(ty,tx),col,o)+(inc||h?`<text x="${mx}" y="${my-10}" text-anchor="middle" font-size="11" font-style="italic" font-family="Georgia,serif" fill="${col}">${e.p}</text>`:'')});
+/* Purple dashed predicate-subject links are not gold construction dependencies.
+   A predicate may couple two or more maps. */
+SUBJECT_EDGES.filter(e=>shown.has(e.a)&&shown.has(e.m)).forEach(e=>{
+ const focused=e.a===sel||e.m===sel;
+ const active=act.has(e.a)&&act.has(e.m);
+ const opacity=focused?.98:active?.62:.15;
+ const A=P[e.a],B=P[e.m],x0=edge(e.a,B.x,B.y),x1=edge(e.m,A.x,A.y);
+ const dx=x1.x-x0.x,dy=x1.y-x0.y;
+ const offset=Math.min(72,Math.abs(dy)*.2+22);
+ const d=`M${x0.x} ${x0.y} C${x0.x+dx*.4} ${x0.y-offset} ${x1.x-dx*.4} ${x1.y-offset} ${x1.x} ${x1.y}`;
+ rg+=`<path d="${d}" stroke="#b69cff" stroke-width="${focused?2.5:1.4}" stroke-dasharray="4 6" fill="none" opacity="${opacity}" pointer-events="none"/>`;
+});
+L.filter(n=>n.k=='M'&&shown.has(n.id)).forEach(m=>{const o=near.has(m.id)?.9:.45;
+sg+=domainBundle(m,o);[...new Set(m.cod)].forEach(x=>sg+=curve(m.id,x,PK,o,'cod '+m.cb[m.cod.indexOf(x)].join(',')))});
+const delta=constructionDelta(sel),newIds=new Set(delta.added.filter(x=>N[x.id]?.k==='A'||N[x.id]?.k==='M').map(x=>x.id)),derivedIds=new Set(delta.entailed.map(x=>x.property)),promotedIds=new Set(delta.refinements.flatMap(q=>q.steps.map(s=>s.id))),promotionAxioms=new Set(delta.refinements.flatMap(q=>q.steps.flatMap(s=>s.axioms)));
+shown.forEach(i=>{const n=N[i],s=i==sel,c=s?GOLD:C[n.k];
+nd+=`<g class="n" data-id="${i}" tabindex="0" role="button" aria-label="${n.name}, ${K[n.k]}" transform="translate(${P[i].x} ${P[i].y})" opacity="${near.has(i)||act.has(i)?1:.5}">${shape(n)} fill="#0e1b37" stroke="${c}" stroke-width="${s?2.8:1.6}"${s?' filter="url(#gl)"':''}/>
+<text y="-3" text-anchor="middle" font-size="14" font-weight="600" fill="#eef3ff">${n.name}</text>
+<text y="15" text-anchor="middle" font-size="9" letter-spacing=".08em" fill="${s?GOLD:C[n.k]}" opacity=".85">${lab(n)}</text>${newIds.has(i)?`<g pointer-events="none"><rect x="${W[i]/2-33}" y="-43" width="53" height="17" rx="6" fill="#352611" stroke="#fbbf24"/><text x="${W[i]/2-6.5}" y="-31" fill="#fbbf24" font-size="10" font-weight="700" text-anchor="middle">NEW</text></g>`:''}${promotedIds.has(i)||promotionAxioms.has(i)?`<g pointer-events="none"><rect x="${W[i]/2-74}" y="-43" width="75" height="17" rx="6" fill="#281d40" stroke="${PURPLE}"/><text x="${W[i]/2-36.5}" y="-31" text-anchor="middle" fill="#e9d8ff" font-size="9" font-weight="700">${promotedIds.has(i)?'PROMOTED':'NEW LAW'}</text></g>`:''}${derivedIds.has(i)?`<g pointer-events="none"><rect x="${W[i]/2-45}" y="-43" width="65" height="17" rx="6" fill="#112e25" stroke="#7be0b4"/><text x="${W[i]/2-12.5}" y="-31" fill="#7be0b4" font-size="10" font-weight="700" text-anchor="middle">FOLLOWS</text></g>`:''}</g>`});
+document.getElementById('rg').innerHTML=rg+(focused?'':contextOverlay());document.getElementById('ed').innerHTML=ed;document.getElementById('sg').innerHTML=sg;document.getElementById('nd').innerHTML=nd}
+/* ---------- camera ---------- */
+const apply=()=>wd.setAttribute('transform',`translate(${cam.x} ${cam.y}) scale(${cam.k})`);
+function go(t,ms=420){if(rm)ms=0;const a={...cam},t0=performance.now();cancelAnimationFrame(raf);
+const f=n=>{const u=ms?Math.min(1,(n-t0)/ms):1,e=1-Math.pow(1-u,3);cam.x=a.x+(t.x-a.x)*e;cam.y=a.y+(t.y-a.y)*e;cam.k=a.k+(t.k-a.k)*e;apply();if(u<1)raf=requestAnimationFrame(f)};f(t0)}
+function fit(ms){const w=cv.clientWidth,h=cv.clientHeight,s=P[sel];let hx=140,hy=100;
+visibleNodes().forEach(i=>{hx=Math.max(hx,Math.abs(P[i].x-s.x)+W[i]/2);hy=Math.max(hy,Math.abs(P[i].y-s.y)+H/2)});
+const k=userZ?cam.k:Math.max(.12,Math.min(1,(w/2-60)/hx,(h/2-90)/hy));go({x:w/2-s.x*k,y:h/2-s.y*k+14,k},ms)}
+function zoomAt(mx,my,k){k=Math.max(.12,Math.min(2.5,k));cam.x=mx-(mx-cam.x)*k/cam.k;cam.y=my-(my-cam.y)*k/cam.k;cam.k=k;userZ=true;apply()}
+/* ---------- navigation ---------- */
+function select(id,push=true,ms){if(!N[id])return;sel=id;
+if(push){hist=hist.slice(0,hi+1);if(hist[hi]!==id){hist.push(id);hi++}}
+history.replaceState(null,'','#'+id);mi=0;layout();draw();panel();fit(ms);
+document.getElementById('bk').disabled=hi<1;document.getElementById('fw').disabled=hi>=hist.length-1}
+const back=()=>{if(hi>0)select(hist[--hi],false)},fwd=()=>{if(hi<hist.length-1)select(hist[++hi],false)};
+function rand(){const c=L.filter(n=>n.id!=sel),w=c.map(n=>1+n.w*deg(n.id)),t=w.reduce((a,b)=>a+b,0);let r=Math.random()*t;for(let i=0;i<c.length;i++){if((r-=w[i])<0)return select(c[i].id)}}
+/* ---------- inspector ---------- */
+const chip=(id,p)=>`<button class="chip" data-id="${id}" style="--c:${C[N[id].k]}">${N[id].name}${p?`<i>${p}</i>`:''}</button>`;
+const sc=t=>`<div class="sc">${t}</div>`;
+function panel(){const n=N[sel];
+let h=`<div class="k" style="color:${C[n.k]}">${K[n.k]}${n.sig||n.p?` · <span class="m">${n.sig||n.p}</span>`:''}</div><h2>${n.name}</h2><p>${n.d}</p>`;
+h+=`<div class="l">${n.pa.map((q,i)=>q+(n.ty[i]&&n.ty[i]!=n.id?' : '+N[n.ty[i]].name:'')).join(' · ')}</div>`;
+
+if(n.k==='S'&&sel!=='set'){
+ const delta=constructionDelta(sel),r=delta.r;
+ if(r){
+ const tag=(id,suffix='')=>chip(id,suffix);
+ h+=`<div class="rt" style="border-color:#b18cff;background:#19162c"><div class="rh" style="color:#e9d8ff">What changes at this step?<span>${r.n}</span></div>`;
+ if(delta.refinements.length){
+  h+=`<div class="l" style="color:#d7b8ff">SAME INSTANCE — REFINED BY THIS CONSTRUCTION</div>`;
+  for(const ref of delta.refinements){
+   h+=`<div class="rt" style="border-color:${PURPLE};background:#211a36"><div class="rh" style="color:#e9d8ff">Same ${ref.parameter}: ${N[ref.weaker].name} → ${N[ref.stronger].name}</div>`;
+   h+=`<div class="l">The same parameter is used by ${ref.inputs.map(id=>N[id].name).join(' and ')}. It is not an independent second structure.</div>`;
+   for(const step of ref.steps){h+=`<div class="l" style="color:#e4c9ff">PROMOTED → ${tag(step.id,ref.parameter)}</div>`;
+    if(step.axioms.length)h+=`<div class="l">NEW CONDITIONS ON THE EXISTING INSTANCE</div>${step.axioms.map(id=>tag(id)).join('')}`;
+   }
+   h+='</div>';
+  }
+ }
+ if(delta.base.length)h+=`<div class="l">INHERITED — already built, not another operation</div>${delta.base.map(x=>tag(x.id,x.p)).join('')}`;
+ if(delta.inheritedAxioms.length)h+=`<div class="l">ALREADY SATISFIED — axioms inherited from earlier stages</div>`+delta.inheritedAxioms.map(id=>tag(id)).join('');
+ if(delta.maps.length)h+=`<div class="l" style="color:#f6c36d">${delta.semantic?.kind==='new'?'NEW OPERATION':'MAP INTRODUCED / USED'}</div>${delta.maps.map(x=>tag(x.id,x.p)).join('')}`;
+ if(delta.axioms.length)h+=`<div class="l" style="color:#f6c36d">NEW REQUIRED AXIOMS — even when added to an OLD map</div>`+delta.axioms.map(x=>`<div>${tag(x.id)}<div class="l" style="margin:0 0 7px 2px">Applies to: ${(OCCURRENCE_SUBJECTS[x.id]||[]).map(v=>OPERATION_INSTANCES[v]?.symbol+' ['+OPERATION_INSTANCES[v]?.carrier+']').join(', ')||N[x.id].uses.map(m=>N[m].name).join(', ')||'existing structure'}</div></div>`).join('');
+ const extra=delta.added.filter(x=>N[x.id]?.k==='S');
+ if(extra.length)h+=`<div class="l">OTHER REQUIRED STRUCTURES (joint inputs / shared instances)</div>${extra.map(x=>tag(x.id,x.p)).join('')}`;
+ if(delta.semantic)h+=`<div class="l" style="color:#e9d8ff">OPERATION IDENTITY: ${delta.semantic.explanation}</div>`;
+ if(delta.entailed.length){const facts=[...new Map(delta.entailed.map(q=>[q.property,q])).values()];
+ h+=`<div class="l" style="color:#9ce3b9">DERIVED — true automatically, not another axiom to impose</div>`+
+ facts.map(q=>`<div class="l">${tag(q.property)} <span style="color:#95bba8">${q.why}</span></div>`).join('');}
+ if(!delta.axioms.length&&!delta.maps.length&&!delta.entailed.length)
+   h+=`<div class="l">This route adds no separate operation axiom; its specified inputs suffice.</div>`;
+ h+='</div>';
+ }
+}
+if(n.k==='S'){const ops=operationInstancesFor(sel);if(ops.length)h+=sc('Distinct operations in this structure')+ops.map(([id,o])=>`<div class="rt"><b>${o.symbol} : ${o.signature}</b><div class="l">${o.description}</div>${chip(o.template,'map template')}</div>`).join('');}
+if(n.k==='A'){
+ if(OCCURRENCE_SUBJECTS[sel])h+=sc('Operation instances involved')+OCCURRENCE_SUBJECTS[sel].map(id=>{const o=OPERATION_INSTANCES[id];return `<div class="l">${o.signature} — ${o.description}</div>`}).join('');
+ h+=sc('Constrains (predicate subjects)')+n.uses.map(x=>chip(x)).join('');
+ if(n.subjectNote)h+=`<div class="l">${n.subjectNote}</div>`;
+ h+=`<div class="l">Purple dashed links connect this axiom to the maps it constrains. The axiom remains an obligatory part of applicable construction routes, without a duplicate gold arrow.</div>`;
+}
+if(n.k==='M'){
+ const constraints=L.filter(a=>a.k==='A'&&a.uses.includes(n.id));
+ if(constraints.length)h+=sc('Axioms involving this map')+constraints.map(a=>chip(a.id)).join('');
+}
+if(n.fm)h+=`<details><summary>Formal</summary><code>${n.fm}</code></details>`;
+if(n.k=='M'){h+=sc('Domain')+[...new Set(n.dom)].map(x=>chip(x,n.dom.filter(y=>y==x).length>1?'× '+n.dom.filter(y=>y==x).length:'')).join('')+sc('Codomain')+[...new Set(n.cod)].map(x=>chip(x)).join('');
+if(n.lw)h+=sc('Constrained by')+n.lw.map(x=>chip(x)).join('');
+if(n.der)h+=sc('Derived from')+chip(n.der)+`<div class="l">Result of the construction. Never a prerequisite for it.</div>`}
+const rs=R.map((r,i)=>[r,i]).filter(([r])=>r.t==sel);
+if(rs.length)h+=sc('Requires')+rs.map(([r,i])=>{const f=r.in[0],rest=r.in.slice(1);
+return`<div class="rt" data-r="${i}"><div class="rh">${r.n}<span>${{joint:'joint',refine:'refinement',kernel:'alternative · sufficient'}[r.m]}</span></div>`+
+(r.m=='joint'?`<div class="l">All required together</div>${r.in.map(x=>chip(x.id,x.p)).join('')}`:
+r.m=='refine'?`<div class="l">Inherits</div>${chip(f.id,f.p)}${rest.length?`<div class="l">Adds to the same bound instance</div>${rest.map(x=>chip(x.id,x.p)).join('')}`:''}${r.x.same?`<div class="l" style="color:${PURPLE}">Shared parameter: ${r.x.same.map(v=>v.parameter).join(', ')} — identical instance, not another copy.</div>`:''}`:
+`<div class="l">Jointly required</div>${r.in.map(x=>chip(x.id,x.p)).join('')}<div class="l">${r.x.d||''}</div>`)+`</div>`}).join('');
+const out=[...new Set(E.filter(e=>e.s==sel).map(e=>e.t))];
+if(out.length)h+=sc('Used in')+out.map(x=>chip(x)).join('');
+if(n.thm)h+=`<div class="th">${n.thm}</div>`;
+h+=`<div class="ev" title="Evidence status: asserted definition, hand-verified, machine-checked">${[0,1,2].map(i=>`<b class="${i<=n.ev?'f':''}"></b>`).join('')}${['asserted','hand-verified','machine-checked'][n.ev]}</div>`;
+ins.innerHTML=h}
+ins.onclick=e=>{const b=e.target.closest('.chip');if(b){select(b.dataset.id);if(innerWidth<=820)ins.classList.remove('o')}};
+ins.onmouseover=e=>{const r=e.target.closest('.rt'),v=r?+r.dataset.r:null;if(v!==hl){hl=v;draw()}};
+ins.onmouseleave=()=>{if(hl!==null){hl=null;draw()}};
+/* ---------- pointer interaction ---------- */
+const pts=new Map();let drag=null,pan=null,pinch=null,edgePress=null;
+// Prefer an available complete method for the currently inspected target.
+// If the edge belongs elsewhere, inspect its target before choosing its method.
+function chooseConstructionEdge(source,target){
+ const candidates=[...new Set(E.filter(e=>e.s===source&&e.t===target).map(e=>e.ri))];
+ if(!candidates.length)return;
+ const available=()=>ms.map((method,i)=>({method,i})).filter(x=>candidates.some(r=>Object.values(x.method).includes(r)));
+ let choices=available();
+ if(!choices.length){select(target);choices=available()}
+ if(!choices.length)return;
+ const current=choices.findIndex(x=>x.i===mi);
+ mi=choices[(current+1)%choices.length].i;
+ setM();draw();panel();
+}
+
+const two=()=>{const a=[...pts.values()];return{d:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),x:(a[0].x+a[1].x)/2,y:(a[0].y+a[1].y)/2}};
+const rel=e=>{const r=cv.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}};
+cv.addEventListener('pointerdown',e=>{if(e.target.closest('#bar,#vp'))return;cv.setPointerCapture(e.pointerId);pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+if(pts.size==2){drag=pan=null;pinch={d:two().d,k:cam.k};return}
+const edgeTarget=e.target.closest('.route-hit');
+if(edgeTarget){edgePress={source:edgeTarget.dataset.source,target:edgeTarget.dataset.target,sx:e.clientX,sy:e.clientY};drag=pan=null;cancelAnimationFrame(raf);return}
+const g=e.target.closest('.n');cancelAnimationFrame(raf);
+if(g)drag={id:g.dataset.id,sx:e.clientX,sy:e.clientY,mv:false,o:{...P[g.dataset.id]}};
+else{pan={sx:e.clientX,sy:e.clientY,cx:cam.x,cy:cam.y};cv.classList.add('pan')}});
+cv.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+if(pinch&&pts.size==2){const t=two(),r=cv.getBoundingClientRect();zoomAt(t.x-r.left,t.y-r.top,pinch.k*t.d/pinch.d);return}
+if(edgePress)return;
+if(drag){const dx=e.clientX-drag.sx,dy=e.clientY-drag.sy;if(!drag.mv&&Math.hypot(dx,dy)>6)drag.mv=true;
+if(drag.mv){manual[drag.id]=P[drag.id]={x:drag.o.x+dx/cam.k,y:drag.o.y+dy/cam.k};draw()}}
+else if(pan){cam.x=pan.cx+e.clientX-pan.sx;cam.y=pan.cy+e.clientY-pan.sy;apply()}});
+const up=e=>{if(!pts.delete(e.pointerId))return;if(pts.size<2)pinch=null;
+if(edgePress){const q=edgePress;edgePress=null;if(Math.hypot(e.clientX-q.sx,e.clientY-q.sy)<9)chooseConstructionEdge(q.source,q.target)}
+else if(drag&&!drag.mv)select(drag.id);drag=pan=null;cv.classList.remove('pan')};
+cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+cv.addEventListener('wheel',e=>{if(e.target.closest('#vp'))return;e.preventDefault();const p=rel(e);zoomAt(p.x,p.y,cam.k*Math.exp(-e.deltaY*(e.ctrlKey?.01:.0015)))},{passive:false});
+sv.addEventListener('keydown',e=>{const g=e.target.closest('.n');if(g&&(e.key=='Enter'||e.key==' ')){e.preventDefault();select(g.dataset.id)}});
+/* ---------- controls ---------- */
+const $=id=>document.getElementById(id);
+$('focus').onclick=()=>{focused=!focused;$('focus').textContent=focused?'Focused ✓':'All branches';$('focus').setAttribute('aria-pressed',String(focused));draw();fit()};$('methodsList').onclick=()=>{const open=$('methodMenu').classList.toggle('open');$('methodsList').setAttribute('aria-expanded',String(open))};$('methodMenu').onclick=e=>{const b=e.target.closest('[data-method]');if(!b)return;mi=+b.dataset.method;setM();draw();$('methodMenu').classList.remove('open');$('methodsList').setAttribute('aria-expanded','false')};document.addEventListener('pointerdown',e=>{if(!e.target.closest('#mw,#methodMenu')){$('methodMenu').classList.remove('open');$('methodsList').setAttribute('aria-expanded','false')}});$('bk').onclick=back;$('fw').onclick=fwd;$('rn').onclick=rand;$('mp').onclick=()=>{mi=(mi-1+ms.length)%ms.length;setM();draw()};$('mn').onclick=()=>{mi=(mi+1)%ms.length;setM();draw()};$('tg').onclick=()=>ins.classList.toggle('o');
+$('dp').oninput=e=>{depth=+e.target.value;$('dv').textContent=depth;layout();draw();fit()};
+$('nl').innerHTML=L.map(n=>`<option value="${n.name}">`).join('');
+$('q').onchange=e=>{const n=L.find(n=>n.name.toLowerCase()==e.target.value.trim().toLowerCase())||L.find(n=>n.name.toLowerCase().includes(e.target.value.trim().toLowerCase()));if(n){select(n.id);e.target.value='';e.target.blur()}};
+$('vb').textContent=`⊢ ${vOK}/${V.length}`;$('vb').style.color=vOK==V.length?'#7be0b4':'#f87171';
+$('vp').innerHTML=V.map(v=>`<div style="color:${v[1]?'#7be0b4':'#f87171'}">${v[1]?'✓':'✗'} ${v[0]}</div>`).join('');
+$('vb').onclick=()=>$('vp').classList.toggle('o');
+addEventListener('keydown',e=>{if(e.target.tagName=='INPUT'&&e.key!='Escape')return;
+if(e.key=='/'){e.preventDefault();$('q').focus()}else if(e.altKey&&e.key=='ArrowLeft')back();else if(e.altKey&&e.key=='ArrowRight')fwd();else if(e.key=='r'&&!e.metaKey&&!e.ctrlKey)rand();else if(e.key=='[')$('mp').click();else if(e.key==']')$('mn').click();else if(e.key=='Escape'){$('methodMenu').classList.remove('open');$('methodsList').setAttribute('aria-expanded','false');$('vp').classList.remove('o');document.activeElement.blur()}});
+let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>fit(0),120)});
+const h0=location.hash.slice(1);select(N[h0]?h0:'vspace',true,0);
 </script></body></html>
