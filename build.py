@@ -14,6 +14,18 @@ def build(source, destination):
         # validated JSON in chunks rather than loading a multi-GB graph in RAM.
         if prefix.startswith('{"schema":"aljabr.lean.v1","metadata":') and ',"nodes":[' in prefix:
             metadata = json.loads(prefix.split(',"nodes":[', 1)[0] + '}')['metadata']
+            if source.stat().st_size > 128*1024*1024:
+                from scripts.atlas_index import build_index
+                raw = source.parent/'mathlib_unified.ndjson'
+                if not raw.exists():
+                    raise ValueError('The full NDJSON export is required to index this large dataset')
+                build_index(raw, destination.with_suffix('.sqlite'), metadata)
+                stub = {'schema': 'aljabr.lean.v1', 'api': True, 'metadata': metadata, 'nodes': [], 'edges': []}
+                temporary = destination.with_suffix('.js.tmp')
+                temporary.write_text('window.ALJABR_DATA=' + json.dumps(stub) + ';\n', encoding='utf8')
+                os.replace(temporary, destination)
+                print(f"Built indexed ALJABR: {metadata['declarations']:,} declarations, {metadata['dependencies']:,} dependencies")
+                return
             destination.parent.mkdir(parents=True, exist_ok=True)
             fd, name = tempfile.mkstemp(dir=destination.parent, suffix='.js')
             try:

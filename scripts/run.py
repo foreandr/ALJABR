@@ -249,8 +249,12 @@ def resume_export(run, stage):
 
 def staged_command(run, args, inputs, output, receipt):
     def signature():
+        additional = [output.with_suffix('.sqlite')] if output.suffix == '.js' and output.with_suffix('.sqlite').exists() else []
+        index_builder = run.root/'scripts'/'atlas_index.py'
+        if output.suffix == '.js' and index_builder.exists():
+            additional.append(index_builder)
         return {str(path): [path.stat().st_size, path.stat().st_mtime_ns]
-                for path in [*inputs, output]}
+                for path in [*inputs, output, *additional]}
     if output.exists() and receipt.exists():
         try:
             if json.loads(receipt.read_text(encoding='utf-8')) == signature():
@@ -370,6 +374,8 @@ def update_math(run, source=None):
         # Publication rolls back every replaced file if any replacement fails.
         publications = [(export, data/export.name), (stage/'lean_import.json', data/'lean_import.json'),
                         (stage/'aljabr-data.js', root/'aljabr-data.js')]
+        if (stage/'aljabr-data.sqlite').exists():
+            publications.insert(2, (stage/'aljabr-data.sqlite', root/'aljabr-data.sqlite'))
         done = []
         try:
             for new, destination in publications:

@@ -17,7 +17,11 @@ Double-click **PULL_AND_RUN.bat** in this folder. It:
    **diagnostics** branch, on success or failure.
 
 Then double-click **2_OPEN_ALJABR.bat** to open the browser. Opening needs no
-mathematics update and does not run the pull-and-build process.
+mathematics update and does not run the pull-and-build process. For a complete
+large atlas, this starts a local Python server at `http://127.0.0.1:8765` and
+loads search results and declaration neighborhoods from a disk index. It keeps
+all mathematics while avoiding a multi-gigabyte browser script. Small datasets
+still open directly as an offline HTML file.
 
 Git and Python 3.9+ must be installed and on PATH. No Python packages or virtual
 environment are needed. The initial Lean/Mathlib download and build can take a
@@ -82,6 +86,12 @@ only after independently parsing the export and matching its declaration and
 edge totals. Incomplete exports and unrelated errors still stop the update.
 Import and browser-file generation stream the large graph rather than loading
 all dependency edges into Python memory at once.
+For large imports, browser generation also creates `aljabr-data.sqlite` and a
+small browser manifest. The local API queries this complete disk index; lists
+and neighborhoods are bounded for display, while the header and inspector
+show the full dataset and dependency counts. Viewer errors are logged in
+`logs/atlas-server-errors.log`. To rebuild only the browser index from existing
+completed mathematics, run `py -3 build.py`; no extraction/import is repeated.
 
 Each process rotates eight 4 MiB log parts; previous run folders remain available
 locally. `summary.json` and `mathematics.json` retain structured command history.

@@ -6,3 +6,5 @@ __pycache__/
 *.pyc
 /diagnostics/latest.json
 /diagnostics/latest.log
+/aljabr-data.sqlite
+/aljabr-data.sqlite.building
