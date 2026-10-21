@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "started_utc": "20261021T034640094169Z",
+  "started_utc": "20261021T044025079975Z",
   "status": "failed",
   "python": "3.14.6 (tags/v3.14.6:c63aec6, Jun 10 2026, 10:26:10) [MSC v.1944 64 bit (AMD64)]",
   "platform": "win32",
@@ -13,7 +13,7 @@
       "cwd": ".",
       "attempt": 1,
       "exit_code": 0,
-      "seconds": 0.09,
+      "seconds": 0.06,
       "timed_out": false
     },
     {
@@ -49,7 +49,7 @@
       "cwd": ".",
       "attempt": 1,
       "exit_code": 0,
-      "seconds": 0.07,
+      "seconds": 0.1,
       "timed_out": false
     },
     {
@@ -62,7 +62,7 @@
       "cwd": ".",
       "attempt": 1,
       "exit_code": 0,
-      "seconds": 0.07,
+      "seconds": 0.12,
       "timed_out": false
     },
     {
@@ -75,7 +75,7 @@
       "cwd": ".",
       "attempt": 1,
       "exit_code": 0,
-      "seconds": 0.07,
+      "seconds": 0.06,
       "timed_out": false
     },
     {
@@ -87,7 +87,7 @@
       "cwd": ".",
       "attempt": 1,
       "exit_code": 0,
-      "seconds": 0.08,
+      "seconds": 0.1,
       "timed_out": false
     },
     {
@@ -100,7 +100,7 @@
       "cwd": ".",
       "attempt": 1,
       "exit_code": 0,
-      "seconds": 0.49,
+      "seconds": 1.0,
       "timed_out": false
     },
     {
@@ -113,7 +113,7 @@
       "cwd": ".",
       "attempt": 1,
       "exit_code": 0,
-      "seconds": 0.08,
+      "seconds": 0.13,
       "timed_out": false
     },
     {
@@ -126,7 +126,7 @@
       "cwd": ".",
       "attempt": 1,
       "exit_code": 0,
-      "seconds": 0.09,
+      "seconds": 0.18,
       "timed_out": false
     },
     {
@@ -138,7 +138,7 @@
       "cwd": ".",
       "attempt": 1,
       "exit_code": 0,
-      "seconds": 0.07,
+      "seconds": 0.12,
       "timed_out": false
     },
     {
@@ -148,20 +148,20 @@
         "C:\\Users\\forea\\Downloads\\ALJABR\\ALJABR\\scripts\\run.py",
         "--worker",
         "--worker-report",
-        "C:\\Users\\forea\\Downloads\\ALJABR\\ALJABR\\logs\\20261021T034640094169Z-24792\\mathematics.json"
+        "C:\\Users\\forea\\Downloads\\ALJABR\\ALJABR\\logs\\20261021T044025079975Z-24848\\mathematics.json"
       ],
       "cwd": ".",
       "attempt": 1,
       "exit_code": 1,
-      "seconds": 2826.65,
+      "seconds": 0.84,
       "timed_out": false
     }
   ],
   "mode": "mathematics",
-  "aljabr_commit": "6f38c3b305a47d5574e009e91d75c6dac013d1ed",
+  "aljabr_commit": "f2d183a79cebcd1ea9719cfff9b84d75ecbe5260",
   "mathematics": {
     "schema": 1,
-    "started_utc": "20261021T034641627009Z",
+    "started_utc": "20261021T044027508010Z",
     "status": "failed",
     "python": "3.14.6 (tags/v3.14.6:c63aec6, Jun 10 2026, 10:26:10) [MSC v.1944 64 bit (AMD64)]",
     "platform": "win32",
@@ -176,7 +176,7 @@
         "cwd": "tools\\mathlib4",
         "attempt": 1,
         "exit_code": 0,
-        "seconds": 0.07,
+        "seconds": 0.09,
         "timed_out": false
       },
       {
@@ -188,232 +188,13 @@
         "cwd": "tools\\mathlib4",
         "attempt": 1,
         "exit_code": 0,
-        "seconds": 0.13,
-        "timed_out": false
-      },
-      {
-        "argv": [
-          "git",
-          "diff",
-          "--cached",
-          "--quiet"
-        ],
-        "cwd": "tools\\mathlib4",
-        "attempt": 1,
-        "exit_code": 0,
-        "seconds": 0.07,
-        "timed_out": false
-      },
-      {
-        "argv": [
-          "git",
-          "fetch",
-          "--depth",
-          "1",
-          "origin",
-          "tag",
-          "v4.29.0"
-        ],
-        "cwd": "tools\\mathlib4",
-        "attempt": 1,
-        "exit_code": 0,
-        "seconds": 0.96,
-        "timed_out": false
-      },
-      {
-        "argv": [
-          "git",
-          "checkout",
-          "--detach",
-          "tags/v4.29.0"
-        ],
-        "cwd": "tools\\mathlib4",
-        "attempt": 1,
-        "exit_code": 0,
-        "seconds": 0.15,
-        "timed_out": false
-      },
-      {
-        "argv": [
-          "git",
-          "remote",
-          "get-url",
-          "origin"
-        ],
-        "cwd": "tools\\lean-graph",
-        "attempt": 1,
-        "exit_code": 0,
-        "seconds": 0.07,
-        "timed_out": false
-      },
-      {
-        "argv": [
-          "git",
-          "status",
-          "--porcelain"
-        ],
-        "cwd": "tools\\lean-graph",
-        "attempt": 1,
-        "exit_code": 0,
-        "seconds": 0.08,
-        "timed_out": false
-      },
-      {
-        "argv": [
-          "git",
-          "status",
-          "--porcelain"
-        ],
-        "cwd": "tools\\lean-graph",
-        "attempt": 1,
-        "exit_code": 0,
-        "seconds": 0.08,
-        "timed_out": false
-      },
-      {
-        "argv": [
-          "git",
-          "pull",
-          "--ff-only"
-        ],
-        "cwd": "tools\\lean-graph",
-        "attempt": 1,
-        "exit_code": 0,
-        "seconds": 0.84,
-        "timed_out": false
-      },
-      {
-        "argv": [
-          "git",
-          "rev-parse",
-          "HEAD"
-        ],
-        "cwd": "tools\\mathlib4",
-        "attempt": 1,
-        "exit_code": 0,
-        "seconds": 0.06,
-        "timed_out": false
-      },
-      {
-        "argv": [
-          "git",
-          "rev-parse",
-          "HEAD"
-        ],
-        "cwd": "tools\\lean-graph",
-        "attempt": 1,
-        "exit_code": 0,
-        "seconds": 0.05,
-        "timed_out": false
-      },
-      {
-        "argv": [
-          "lake",
-          "--version"
-        ],
-        "cwd": "tools\\mathlib4",
-        "attempt": 1,
-        "exit_code": 0,
-        "seconds": 0.16,
-        "timed_out": false
-      },
-      {
-        "argv": [
-          "C:\\Users\\forea\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
-          "C:\\Users\\forea\\Downloads\\ALJABR\\ALJABR\\verify_lock.py",
-          "save"
-        ],
-        "cwd": ".",
-        "attempt": 1,
-        "exit_code": 0,
-        "seconds": 0.13,
-        "timed_out": false
-      },
-      {
-        "argv": [
-          "lake",
-          "exe",
-          "cache",
-          "get"
-        ],
-        "cwd": "tools\\mathlib4",
-        "attempt": 1,
-        "exit_code": 0,
-        "seconds": 598.66,
-        "timed_out": false
-      },
-      {
-        "argv": [
-          "C:\\Users\\forea\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
-          "C:\\Users\\forea\\Downloads\\ALJABR\\ALJABR\\setup_lean.py"
-        ],
-        "cwd": ".",
-        "attempt": 1,
-        "exit_code": 0,
-        "seconds": 0.94,
-        "timed_out": false
-      },
-      {
-        "argv": [
-          "lake",
-          "update",
-          "leanGraph",
-          "--keep-toolchain"
-        ],
-        "cwd": "tools\\mathlib4",
-        "attempt": 1,
-        "exit_code": 0,
-        "seconds": 9.74,
-        "timed_out": false
-      },
-      {
-        "argv": [
-          "C:\\Users\\forea\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
-          "C:\\Users\\forea\\Downloads\\ALJABR\\ALJABR\\verify_lock.py",
-          "check"
-        ],
-        "cwd": ".",
-        "attempt": 1,
-        "exit_code": 0,
-        "seconds": 0.22,
-        "timed_out": false
-      },
-      {
-        "argv": [
-          "lake",
-          "build",
-          "graph"
-        ],
-        "cwd": "tools\\mathlib4",
-        "attempt": 1,
-        "exit_code": 0,
-        "seconds": 45.31,
-        "timed_out": false
-      },
-      {
-        "argv": [
-          "lake",
-          "exe",
-          "graph",
-          "--mode",
-          "unified",
-          "--to",
-          "Mathlib",
-          "C:\\Users\\forea\\Downloads\\ALJABR\\ALJABR\\data\\.aljabr-jco6852n\\mathlib_unified.ndjson"
-        ],
-        "cwd": "tools\\mathlib4",
-        "attempt": 1,
-        "exit_code": 1,
-        "seconds": 2168.52,
+        "seconds": 0.33,
         "timed_out": false
       }
     ],
     "mode": "mathematics",
-    "mathlib4_commit": "8a178386ffc0f5fef0b77738bb5449d50efeea95",
-    "lean-graph_commit": "3bf57c70f0326e45b9e84345c8fe7cf520919358",
-    "toolchain": "leanprover/lean4:v4.29.0",
-    "error": "Command failed (exit 1): lake exe graph --mode unified --to Mathlib C:\\Users\\forea\\Downloads\\ALJABR\\ALJABR\\data\\.aljabr-jco6852n\\mathlib_unified.ndjson"
+    "error": "Local Mathlib source edits found; preserve them before updating."
   },
-  "error": "Command failed (exit 1): C:\\Users\\forea\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe -u C:\\Users\\forea\\Downloads\\ALJABR\\ALJABR\\scripts\\run.py --worker --worker-report C:\\Users\\forea\\Downloads\\ALJABR\\ALJABR\\logs\\20261021T034640094169Z-24792\\mathematics.json",
-  "seconds": 2828.02
+  "error": "Command failed (exit 1): C:\\Users\\forea\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe -u C:\\Users\\forea\\Downloads\\ALJABR\\ALJABR\\scripts\\run.py --worker --worker-report C:\\Users\\forea\\Downloads\\ALJABR\\ALJABR\\logs\\20261021T044025079975Z-24848\\mathematics.json",
+  "seconds": 2.93
 }
