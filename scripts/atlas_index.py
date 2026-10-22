@@ -56,17 +56,35 @@ def build_index(source, destination, metadata):
 
 
 def search(connection, query='', kind=''):
-    conditions, args = [], []
+    """Put exact declarations first so e.g. Module is not lost to fuzzy LIMIT."""
+    aliases = {'structure': 'struct', 'inductive': 'ind'}
+    kinds = STRUCTURE_TYPES if kind == 'structures' else (kind, aliases.get(kind, kind))
+    clause = ' AND decl_type IN (' + ','.join('?' for _ in kinds) + ')' if kind else ''
+    args = list(kinds) if kind else []
+    results = []
+    seen = set()
     if query:
-        conditions.append('instr(lower(name), lower(?)) > 0')
-        args.append(query)
+        # Primary-key lookup is fast even for existing enormous indexes with no
+        # secondary name index. This protects exact case-sensitive Lean names.
+        row = connection.execute('SELECT payload FROM nodes WHERE id=?' + clause,
+                                 ('lean:' + query, *args)).fetchone()
+        if row:
+            value = json.loads(row[0])
+            seen.add(value['id'])
+            results.append(value)
+    where = ' WHERE instr(lower(name),lower(?))>0' if query else ' WHERE 1=1'
     if kind:
-        alias = {'structure': 'struct', 'inductive': 'ind'}.get(kind, kind)
-        conditions.append('decl_type IN (?,?)')
-        args.extend((kind, alias))
-    where = ' WHERE ' + ' AND '.join(conditions) if conditions else ''
-    return [json.loads(row[0]) for row in connection.execute('SELECT payload FROM nodes' + where + ' LIMIT 180', args)]
-
+        where += clause
+    rows = connection.execute('SELECT payload FROM nodes' + where + ' LIMIT ?',
+                              ((query,) if query else ()) + tuple(args) + (180,)).fetchall()
+    for row in rows:
+        value = json.loads(row[0])
+        if value['id'] not in seen:
+            results.append(value)
+            seen.add(value['id'])
+        if len(results) >= 180:
+            break
+    return results
 
 
 STRUCTURE_TYPES = ('class', 'struct', 'structure')
