@@ -68,14 +68,59 @@ def search(connection, query='', kind=''):
     return [json.loads(row[0]) for row in connection.execute('SELECT payload FROM nodes' + where + ' LIMIT 180', args)]
 
 
-def neighborhood(connection, ident):
+
+STRUCTURE_TYPES = ('class', 'struct', 'structure')
+RELATION_KINDS = ('extends', 'field', 'sig', 'def', 'proof', 'docref')
+
+
+def _sample_edges(connection, ident, side, view='all', relation='all', limit=100):
+    """Sample actual Lean edges, prioritizing explicit structural links.
+
+    The original API returned the first 100 incoming rows, normally drowning
+    class/structure descendants in generated instances and theorem references.
+    Filter in SQLite BEFORE LIMIT rather than filtering a truncated result.
+    """
+    if side not in ('source', 'target'):
+        raise ValueError('Invalid dependency direction')
+    if view not in ('all', 'structures'):
+        raise ValueError('Invalid graph view')
+    if relation not in ('all', *RELATION_KINDS):
+        raise ValueError('Invalid relation')
+    peer = 'target' if side == 'source' else 'source'
+    sql = ('SELECT e.source,e.target,e.kind,e.extras FROM edges e ' +
+           ('JOIN nodes neighbor ON neighbor.id=e.' + peer + ' ' if view == 'structures' else '') +
+           'WHERE e.' + side + '=?')
+    args = [ident]
+    if view == 'structures':
+        sql += ' AND neighbor.decl_type IN (?,?,?)'
+        args.extend(STRUCTURE_TYPES)
+
+    if relation != 'all':
+        return connection.execute(sql + ' AND e.kind=? LIMIT ?', (*args, relation, limit)).fetchall()
+
+    # Deliberately prefer Lean's explicit structure extension and field links.
+    # These are source references, not asserted construction routes.
+    if view == 'structures':
+        rows = []
+        for kind in RELATION_KINDS:
+            rows.extend(connection.execute(sql + ' AND e.kind=? LIMIT ?',
+                                           (*args, kind, limit-len(rows))).fetchall())
+            if len(rows) >= limit:
+                break
+        return rows
+    return connection.execute(sql + ' LIMIT ?', (*args, limit)).fetchall()
+
+
+def neighborhood(connection, ident, view='all', relation='all'):
     row = connection.execute('SELECT payload FROM nodes WHERE id=?', (ident,)).fetchone()
     if row is None:
         return None
-    outgoing = connection.execute('SELECT source,target,kind,extras FROM edges WHERE source=? LIMIT 100', (ident,)).fetchall()
-    incoming = connection.execute('SELECT source,target,kind,extras FROM edges WHERE target=? LIMIT 100', (ident,)).fetchall()
-    edges = [dict(source=s, target=t, kind=k, **json.loads(extra)) for s, t, k, extra in outgoing + incoming]
+    outgoing = _sample_edges(connection, ident, 'source', view, relation)
+    incoming = _sample_edges(connection, ident, 'target', view, relation)
+    edges = [dict(source=s, target=t, kind=k, **json.loads(extra))
+             for s, t, k, extra in outgoing + incoming]
     ids = {ident} | {edge['source'] for edge in edges} | {edge['target'] for edge in edges}
+    # A dependency may point to an external/builtin declaration with no node.
     nodes = []
     for key in ids:
         found = connection.execute('SELECT payload FROM nodes WHERE id=?', (key,)).fetchone()
@@ -83,4 +128,6 @@ def neighborhood(connection, ident):
             nodes.append(json.loads(found[0]))
     return {'node': json.loads(row[0]), 'nodes': nodes, 'edges': edges,
             'out_count': connection.execute('SELECT count(*) FROM edges WHERE source=?', (ident,)).fetchone()[0],
-            'in_count': connection.execute('SELECT count(*) FROM edges WHERE target=?', (ident,)).fetchone()[0]}
+            'in_count': connection.execute('SELECT count(*) FROM edges WHERE target=?', (ident,)).fetchone()[0],
+            'view': view, 'relation': relation,
+            'out_sample': len(outgoing), 'in_sample': len(incoming)}
