@@ -28,7 +28,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(payload)
             return
         if not url.path.startswith('/api/'):
-            if url.path not in ('/', '/aljabr.html', '/aljabr-data.js', '/atlas-client.js', '/favicon.ico'):
+            if url.path not in ('/', '/aljabr.html', '/constructions.html', '/aljabr-data.js', '/atlas-client.js', '/favicon.ico'):
                 self.send_error(404)
                 return
             return super().do_GET()
@@ -39,7 +39,9 @@ class Handler(SimpleHTTPRequestHandler):
             elif url.path == '/api/search':
                 result = search(database, query.get('q', [''])[0], query.get('type', [''])[0])
             elif url.path == '/api/node':
-                result = neighborhood(database, query.get('id', [''])[0])
+                result = neighborhood(database, query.get('id', [''])[0],
+                                      query.get('view', ['all'])[0],
+                                      query.get('relation', ['all'])[0])
             else:
                 self.send_error(404)
                 return
