@@ -124,10 +124,27 @@ A full Lean/Mathlib build is a separate, substantial end-to-end operation.
 
 ## Interface
 
-ALJABR uses the October 14 interface styling with one graph powered entirely
-by the local Lean database. The hand-authored model has been removed.
-Search, dependency relations, trace depth, focus, navigation, pan/zoom and the
-inspector operate on imported declarations and edges. Relations distinguish
-signature, proof and definition dependencies; they do not invent constructions.
-The canvas loads bounded neighborhoods while all edges remain in SQLite.
-No mathematics rebuild is needed for interface changes.
+Two mathematical views are available without rebuilding Mathlib:
+
+- **Constructions** (`constructions.html`): the restored October 14 hand-curated
+  atlas with mathematical structures, maps, axioms, multiple construction routes,
+  prerequisites on the left and consequences on the right. Its routes are
+  editorial mathematics, not derived automatically from Lean Graph.
+- **Lean dependencies** (`aljabr.html`): the full imported declaration graph.
+  Searching a class or structure defaults to **Structures**, which selects
+  direct class/structure references *before* SQL result limits. Toggle **All
+  declarations** to include theorems, definitions and generated instances.
+  Relation filters include explicit `extends` and `field` links alongside
+  signature, definition and proof references.
+
+The graph displays bounded neighborhoods (70 canvas nodes, 100 database edges
+per direction) and shows full unfiltered dependency counts in the inspector.
+Arrows point from prerequisites to the declarations that reference them. An
+ordinary Lean reference does not prove that a mathematical structure is
+constructed from another. The curated atlas and Lean dependency graph remain
+distinct for that reason.
+
+The original 100-row unfiltered SQL neighborhood query could hide all class
+descendants behind generated instance references. The server now filters in
+SQLite before applying its display limit; the index is reused without a fresh
+mathematics extraction.
