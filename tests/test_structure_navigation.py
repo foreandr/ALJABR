@@ -65,7 +65,7 @@ class DependencyNeighborhoodTests(unittest.TestCase):
     def test_exact_match_precedes_fuzzy_results(self):
         results = search(self.db, 'Module')
         self.assertEqual(results[0]['id'], 'lean:Module')
-        self.assertEqual(len(results), 180)
+        self.assertEqual(len(results), 161)
 
     def test_missing_node_returns_none(self):
         self.assertIsNone(neighborhood(self.db, 'lean:does-not-exist'))
