@@ -4,7 +4,63 @@
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmt = n => Number(n || 0).toLocaleString();
-  const api = async path => { const r = await fetch('/api/' + path); if (!r.ok) throw Error(`Request failed (${r.status})`); return r.json(); };
+  // Small imports open as file:// without a Python server. Larger imports
+  // use the same response shapes from the local SQLite-backed /api endpoint.
+  let offline;
+  function offlineRequest(path) {
+    if(!offline) {
+      const data=window.ALJABR_DATA||{metadata:{declarations:0,dependencies:0},nodes:[],edges:[]};
+      const byId=new Map((data.nodes||[]).map(n=>[n.id,n]));
+      const bySource=new Map(),byTarget=new Map();
+      for(const e of data.edges||[]) {
+        if(!bySource.has(e.source))bySource.set(e.source,[]);
+        if(!byTarget.has(e.target))byTarget.set(e.target,[]);
+        bySource.get(e.source).push(e);
+        byTarget.get(e.target).push(e);
+      }
+      offline={data,byId,bySource,byTarget};
+    }
+    const {data,byId,bySource,byTarget}=offline;
+    const [action,query='']=path.split('?');
+    const p=new URLSearchParams(query);
+    if(action==='health')return {app:'ALJABR',metadata:data.metadata};
+    if(action==='search') {
+      const term=(p.get('q')||'').toLowerCase();
+      const exact=byId.get('lean:'+(p.get('q')||''));
+      const matches=[];
+      if(exact)matches.push(exact);
+      for(const node of data.nodes||[]) {
+        if(matches.length>=180)break;
+        if(node.id!==exact?.id&&node.name.toLowerCase().includes(term))matches.push(node);
+      }
+      return matches;
+    }
+    if(action!=='node')throw Error('Unsupported offline API: '+action);
+    const id=p.get('id'),node=byId.get(id);
+    if(!node)return null;
+    const view=p.get('view')||'all',relation=p.get('relation')||'all';
+    const kinds=['extends','field','sig','def','proof','docref'];
+    const sample=(items,peer)=> {
+      let matching=items.filter(e=>(relation==='all'||e.kind===relation)&&
+        (view!=='structures'||['class','struct','structure'].includes(byId.get(e[peer])?.decl_type)));
+      if(view==='structures'&&relation==='all')
+        matching=matching.slice().sort((a,b)=>kinds.indexOf(a.kind)-kinds.indexOf(b.kind));
+      return matching.slice(0,100);
+    };
+    const outgoing=sample(bySource.get(id)||[],'target');
+    const incoming=sample(byTarget.get(id)||[],'source');
+    const edges=[...outgoing,...incoming];
+    const ids=new Set([id,...edges.flatMap(e=>[e.source,e.target])]);
+    return {node,nodes:[...ids].map(id=>byId.get(id)).filter(Boolean),edges,
+      out_count:(bySource.get(id)||[]).length,in_count:(byTarget.get(id)||[]).length,
+      out_sample:outgoing.length,in_sample:incoming.length,view,relation};
+  }
+  const api = async path => {
+    if(location.protocol==='file:')return offlineRequest(path);
+    const r = await fetch('/api/' + path);
+    if(!r.ok)throw Error(`Request failed (${r.status})`);
+    return r.json();
+  };
   const colors = {class:'#6cb4ff',struct:'#6cb4ff',axiom:'#7be0b4',thm:'#7be0b4'};
   const color = n => colors[n.decl_type] || '#f0a15b';
   let current, nodes = new Map(), edges = [], positions = new Map(), selected, generation = 0;
@@ -118,7 +174,7 @@
       const groups=new Map();
       for(const [key,col] of cols){if(!groups.has(col))groups.set(col,[]);groups.get(col).push(key);}
       for(const [col,ids] of groups)ids.forEach((key,i)=>positions.set(key,{x:col*490,y:(i-(ids.length-1)/2)*100}));
-      if(push)history.pushState({lean:id},'', '/aljabr.html#'+encodeURIComponent(id));
+      if(push)history.pushState({lean:id},'', (location.protocol==='file:'?'#':'/aljabr.html#')+encodeURIComponent(id));
       $('viewmode').textContent=view==='structures'?'Structures ✓':'All declarations';
       $('viewmode').setAttribute('aria-pressed',String(view==='structures'));
       $('methodCount').textContent=fmt(nodes.size)+' nodes';
