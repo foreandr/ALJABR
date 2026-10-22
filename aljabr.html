@@ -17,6 +17,7 @@ button,input{font:inherit;color:inherit}
 .b{background:#12203d;border:1px solid var(--ln);border-radius:8px;padding:7px 13px;cursor:pointer;min-height:34px}
 .b:hover:not(:disabled),.b:focus-visible{border-color:var(--gold);outline:none}
 .b:disabled{opacity:.3;cursor:default}
+a.b{color:var(--tx);text-decoration:none;display:inline-flex;align-items:center}
 #brand{font:600 13px Georgia,serif;letter-spacing:.32em;margin-right:10px;color:#cfd9ee}
 #q{background:#0d1a34;border:1px solid var(--ln);border-radius:8px;padding:7px 11px;width:170px;min-height:34px}
 #q:focus{outline:none;border-color:var(--gold)}
@@ -71,11 +72,13 @@ code{display:block;white-space:pre-wrap;margin-top:5px;font:12.5px ui-monospace,
 <filter id="gl" x="-40%" y="-60%" width="180%" height="220%"><feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="#fbbf24" flood-opacity=".75"/></filter></defs>
 <g id="wd"><rect x="-9000" y="-9000" width="26000" height="26000" fill="url(#dt)"/><g id="rg"></g><g id="ed"></g><g id="sg"></g><g id="nd"></g></g></svg>
 <div id="bar"><span id="brand">ALJABR</span>
+<a class="b" href="constructions.html" title="Original structures, maps, axioms and construction routes">Constructions ↗</a>
+<button class="b" id="viewmode" aria-pressed="false" title="Show only related Lean CLASS and STRUCT declarations">All declarations</button>
 <button class="b" id="bk" aria-label="Back">‹ Back</button><button class="b" id="fw" aria-label="Forward">Forward ›</button>
-<button class="b" id="rn">Random</button><button class="b" id="focus" aria-pressed="true" title="Show dependencies only">Focused ✓</button>
+<button class="b" id="rn">Random</button><button class="b" id="focus" aria-pressed="false" title="Show dependencies only">All branches</button>
 <div class="dp" id="mw"><button class="b" id="mp" aria-label="Previous relation">‹</button><span id="methodCount" aria-live="polite"></span><span id="mt"></span><button class="b" id="mn" aria-label="Next relation">›</button><button class="b" id="methodsList" aria-label="Show dependency relations" aria-expanded="false">Relations ▾</button></div><div id="methodMenu" role="group" aria-label="Dependency relations"></div>
 <input id="q" list="nl" placeholder="Search  /" aria-label="Search concepts"><datalist id="nl"></datalist>
-<label class="dp">Trace <input type="range" id="dp" min="1" max="12" value="10"><span id="dv">10</span></label>
+<label class="dp">Trace <input type="range" id="dp" min="1" max="12" value="1"><span id="dv">1</span></label>
 <button class="b" id="vb" aria-label="Validation report"></button><button class="b" id="tg" aria-label="Inspector">i</button></div>
 <div id="vp"></div></div>
 <aside id="ins" aria-live="polite"></aside></div>
